@@ -1,39 +1,41 @@
-"""The fixed-point specification: word layout, scaling, and range."""
+"""The fixed-point specification: word layout, scaling, range, and byte forms."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from decimal import ROUND_HALF_EVEN, Decimal, localcontext
+from decimal import Decimal, localcontext
+from fractions import Fraction
+from typing import TYPE_CHECKING, TypedDict
 
-from ._errors import FxpError, FxpOverflowError
+from . import _flat
+from ._errors import FxpError
+from ._numbers import Number, as_decimal, as_fraction, as_int, digits
+from ._quantize import LV_ROUND_HALF_EVEN, check_rounding, fit, overflow_mode, round_exact
 
-Number = int | float | Decimal | str
+if TYPE_CHECKING:
+    from typing_extensions import Unpack
 
-
-def _as_decimal(value: Number) -> Decimal:
-    """Convert to Decimal without inheriting binary float noise."""
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, float):
-        return Decimal(str(value))
-    return Decimal(value)
+MAX_WORD_LENGTH = 64
+"""LabVIEW fixed-point words hold between 1 and 64 bits."""
 
 
-def _digits(value: Decimal) -> int:
-    parts = value.as_tuple()
-    return len(parts.digits) + abs(int(parts.exponent))
+class EncodeOptions(TypedDict, total=False):
+    """Keyword options shared by every encoding method (see :meth:`FxpSpec.encode`)."""
+
+    clamp: bool
+    overflow: str
+    rounding: str
 
 
 @dataclass(frozen=True)
 class FxpSpec:
     """A LabVIEW fixed-point layout: ``<signed, word_length, integer_word_length>``.
 
-    The stored word holds ``word_length`` bits, two's complement when ``signed``. The
+    The word holds ``word_length`` bits (1 to 64), two's complement when ``signed``. Its
     real value is ``offset + coded * resolution``, where ``coded`` is the word read as an
     integer and ``resolution`` defaults to ``2 ** (integer_word_length - word_length)``.
-    ``integer_word_length`` may exceed ``word_length`` or be negative, exactly as LabVIEW
-    allows: only the bits that fit are stored.
+    ``integer_word_length`` may exceed ``word_length`` or be negative.
     """
 
     word_length: int
@@ -43,11 +45,14 @@ class FxpSpec:
     offset: Number = Decimal(0)
 
     def __post_init__(self) -> None:
-        if self.word_length < 1:
-            raise FxpError("word_length must be at least 1")
-        object.__setattr__(self, "offset", _as_decimal(self.offset))
+        if not 1 <= as_int(self.word_length, "word_length") <= MAX_WORD_LENGTH:
+            raise FxpError(f"word_length must be between 1 and {MAX_WORD_LENGTH}")
+        as_int(self.integer_word_length, "integer_word_length")
+        if not isinstance(self.signed, bool):
+            raise FxpError("signed must be a bool")
+        object.__setattr__(self, "offset", as_decimal(self.offset, "offset"))
         if self.delta is not None:
-            resolved = _as_decimal(self.delta)
+            resolved = as_decimal(self.delta, "delta")
             if resolved <= 0:
                 raise FxpError("delta must be positive")
             object.__setattr__(self, "delta", resolved)
@@ -56,12 +61,11 @@ class FxpSpec:
     def resolution(self) -> Decimal:
         """Value of the least significant bit (the quantization step)."""
         if self.delta is not None:
-            return _as_decimal(self.delta)
+            return as_decimal(self.delta)
         exponent = self.integer_word_length - self.word_length
         if exponent >= 0:
             return Decimal(2**exponent)
-        step = -exponent
-        return Decimal(5**step).scaleb(-step)
+        return Decimal(f"{5**-exponent}E{exponent}")  # exact: scaleb would round
 
     @property
     def _coded_min(self) -> int:
@@ -69,9 +73,8 @@ class FxpSpec:
 
     @property
     def _coded_max(self) -> int:
-        if self.signed:
-            return (1 << (self.word_length - 1)) - 1
-        return (1 << self.word_length) - 1
+        bits = self.word_length - 1 if self.signed else self.word_length
+        return (1 << bits) - 1
 
     @property
     def min_value(self) -> Decimal:
@@ -84,10 +87,9 @@ class FxpSpec:
         return self._scale(self._coded_max)
 
     def _scale(self, coded: int) -> Decimal:
-        resolution = self.resolution
-        offset = _as_decimal(self.offset)
+        resolution, offset = self.resolution, as_decimal(self.offset)
         with localcontext() as ctx:
-            ctx.prec = _digits(Decimal(coded)) + _digits(resolution) + _digits(offset) + 10
+            ctx.prec = digits(Decimal(coded)) + digits(resolution) + digits(offset) + 10
             return offset + Decimal(coded) * resolution
 
     def encode(
@@ -95,89 +97,86 @@ class FxpSpec:
         value: Number,
         *,
         clamp: bool = False,
-        rounding: str = ROUND_HALF_EVEN,
+        overflow: str = "raise",
+        rounding: str = LV_ROUND_HALF_EVEN,
     ) -> int:
-        """Return the unsigned ``word_length``-bit word for ``value``.
+        """Return the unsigned ``word_length``-bit word for ``value``, rounded exactly.
 
-        Out-of-range values raise :class:`FxpOverflowError` unless ``clamp`` saturates
-        them to the nearest representable bound. ``rounding`` is any ``decimal`` mode.
+        ``overflow`` is ``"raise"`` (:class:`FxpOverflowError`), ``"saturate"`` or
+        ``"wrap"``; ``clamp=True`` is shorthand for ``"saturate"``. ``rounding`` is a
+        ``decimal`` mode or one of ``LV_TRUNCATE``, ``LV_ROUND_HALF_UP``,
+        ``LV_ROUND_HALF_EVEN`` (the default, as in LabVIEW).
         """
-        target = _as_decimal(value)
-        resolution = self.resolution
-        offset = _as_decimal(self.offset)
-        with localcontext() as ctx:
-            ctx.prec = _digits(target) + _digits(resolution) + _digits(offset) + 10
-            quotient = (target - offset) / resolution
-            coded = int(quotient.to_integral_value(rounding=rounding))
-        coded = self._fit(coded, clamp)
+        mode = overflow_mode(clamp, overflow)
+        check_rounding(rounding)
+        step = Fraction(self.resolution)
+        quotient = (as_fraction(value) - Fraction(as_decimal(self.offset))) / step
+        coded = fit(round_exact(quotient, rounding), self.word_length, self.signed, mode)
         return coded + (1 << self.word_length) if coded < 0 else coded
 
     def decode(self, word: int) -> Decimal:
-        """Return the real value of an unsigned ``word_length``-bit word.
+        """Return the exact real value of an unsigned ``word_length``-bit word.
 
-        A negative ``word`` is accepted as an already-signed value when the layout is
+        A negative ``word`` is accepted as an already-signed code when the layout is
         signed, so decoding round-trips whichever form the caller holds.
         """
         span = 1 << self.word_length
-        if word < 0:
+        if as_int(word, "word") < 0:
             if not self.signed or word < self._coded_min:
                 raise FxpError(f"word {word} is out of range for this layout")
             word += span
-        if not 0 <= word < span:
+        if word >= span:
             raise FxpError(f"word {word} does not fit {self.word_length} bits")
-        coded = word - span if self.signed and word > self._coded_max else word
-        return self._scale(coded)
+        return self._scale(word - span if self.signed and word > self._coded_max else word)
 
-    @property
-    def byte_length(self) -> int:
-        """Whole bytes needed to flatten the word, big-endian, as LabVIEW does."""
-        return (self.word_length + 7) // 8
-
-    def pack(
-        self,
-        value: Number,
-        *,
-        clamp: bool = False,
-        rounding: str = ROUND_HALF_EVEN,
-    ) -> bytes:
-        """Encode ``value`` and flatten it to big-endian bytes.
-
-        The word fills :attr:`byte_length` bytes; any bits above ``word_length`` in the
-        most significant byte are written as zero. See :meth:`encode` for ``clamp`` and
-        ``rounding``.
-        """
-        word = self.encode(value, clamp=clamp, rounding=rounding)
-        return word.to_bytes(self.byte_length, "big")
-
-    def unpack(self, data: bytes | bytearray) -> Decimal:
-        """Decode a big-endian flattened word of exactly :attr:`byte_length` bytes.
-
-        Bits above ``word_length`` in the most significant byte are ignored, so a word
-        that a producer sign-extended into whole bytes decodes to the same value.
-        """
-        if len(data) != self.byte_length:
-            raise FxpError(f"expected {self.byte_length} bytes, got {len(data)}")
-        word = int.from_bytes(data, "big") & ((1 << self.word_length) - 1)
-        return self.decode(word)
-
-    def encode_many(
-        self,
-        values: Iterable[Number],
-        *,
-        clamp: bool = False,
-        rounding: str = ROUND_HALF_EVEN,
-    ) -> list[int]:
-        """Encode each value with :meth:`encode`, reusing this layout."""
-        return [self.encode(value, clamp=clamp, rounding=rounding) for value in values]
+    def encode_many(self, values: Iterable[Number], **options: Unpack[EncodeOptions]) -> list[int]:
+        """Encode each value with :meth:`encode` and the same keyword options."""
+        return [self.encode(value, **options) for value in values]
 
     def decode_many(self, words: Iterable[int]) -> list[Decimal]:
         """Decode each word with :meth:`decode`, reusing this layout."""
         return [self.decode(word) for word in words]
 
-    def _fit(self, coded: int, clamp: bool) -> int:
-        low, high = self._coded_min, self._coded_max
-        if coded < low or coded > high:
-            if not clamp:
-                raise FxpOverflowError(f"value needs code {coded}, outside [{low}, {high}]")
-            return min(max(coded, low), high)
-        return coded
+    @property
+    def byte_length(self) -> int:
+        """Bytes in LabVIEW's flattened form: always 8 (see :meth:`pack`)."""
+        return _flat.FLATTENED_SIZE
+
+    @property
+    def compact_byte_length(self) -> int:
+        """Bytes in the compact, non-LabVIEW form: ``ceil(word_length / 8)``."""
+        return _flat.compact_size(self.word_length)
+
+    def pack(self, value: Number, **options: Unpack[EncodeOptions]) -> bytes:
+        """Encode ``value`` and flatten it as LabVIEW does: 8 bytes, big-endian.
+
+        The word sits in the low bits, sign extended when signed and zero extended when
+        unsigned. Keyword options are those of :meth:`encode`.
+        """
+        word = self.encode(value, **options)
+        return _flat.flatten_word(word, self.word_length, self.signed)
+
+    def unpack(self, data: bytes | bytearray) -> Decimal:
+        """Decode LabVIEW's 8-byte flattened form; the high bits must be the extension."""
+        return self.decode(_flat.unflatten_word(data, self.word_length, self.signed))
+
+    def pack_compact(self, value: Number, **options: Unpack[EncodeOptions]) -> bytes:
+        """Encode ``value`` into ``compact_byte_length`` big-endian bytes.
+
+        This is lvfxp's own dense form, not something LabVIEW reads or writes.
+        """
+        word = self.encode(value, **options)
+        return _flat.compact_word(word, self.word_length)
+
+    def unpack_compact(self, data: bytes | bytearray) -> Decimal:
+        """Decode the compact form; bits above ``word_length`` are ignored."""
+        return self.decode(_flat.uncompact_word(data, self.word_length))
+
+    def pack_array(self, values: Iterable[Number], **options: Unpack[EncodeOptions]) -> bytes:
+        """Flatten a 1-D array: a big-endian 32-bit count, then 8 bytes per element."""
+        words = self.encode_many(values, **options)
+        return _flat.flatten_array(words, self.word_length, self.signed)
+
+    def unpack_array(self, data: bytes | bytearray) -> list[Decimal]:
+        """Decode a flattened 1-D array written by :meth:`pack_array` or LabVIEW."""
+        return self.decode_many(_flat.unflatten_array(data, self.word_length, self.signed))
