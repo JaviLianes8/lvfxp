@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lvfxp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Encode and decode LabVIEW fixed-point (FXP) numbers in pure Python"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = []
+
+[project.scripts]
+lvfxp = "lvfxp._cli:main"
 
 [project.optional-dependencies]
 dev = ["ruff", "mypy", "pytest", "build", "twine"]

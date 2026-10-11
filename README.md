@@ -27,17 +27,17 @@ from decimal import Decimal
 from lvfxp import FxpSpec, from_fxp, to_fxp
 
 # Signed layout with word length 8 and integer word length 5: resolution 0.125.
-word = to_fxp(Decimal("15.875"), 8, 5)   # 127 (0x7F)
-value = from_fxp(word, 8, 5)             # Decimal("15.875")
+word = to_fxp(Decimal("15.875"), 8, 5)  # 127 (0x7F)
+value = from_fxp(word, 8, 5)  # Decimal("15.875")
 
 # Negative values round-trip through two's complement.
 from_fxp(to_fxp(Decimal("-2.5"), 4, 3), 4, 3)  # Decimal("-2.5")
 
 # A spec exposes the resolution and the representable range.
 spec = FxpSpec(word_length=8, integer_word_length=5, signed=True)
-spec.resolution   # Decimal("0.125")
-spec.min_value    # Decimal("-16")
-spec.max_value    # Decimal("15.875")
+spec.resolution  # Decimal("0.125")
+spec.min_value  # Decimal("-16")
+spec.max_value  # Decimal("15.875")
 
 # Out-of-range values raise by default, or saturate when you ask them to.
 to_fxp(Decimal("16"), 8, 5, clamp=True)  # 127
@@ -49,6 +49,50 @@ FxpSpec(8, 8, signed=False, delta=Decimal("0.1"), offset=Decimal("1")).decode(5)
 Decoding returns a `Decimal`, so results stay exact even at tiny resolutions such as
 `2 ** -64`, where a binary float would lose precision. Encoding uses round-half-to-even by
 default (LabVIEW's default coercion), and any `decimal` rounding mode can be passed.
+
+## Flattened bytes
+
+LabVIEW exchanges a fixed-point number as its coded integer in two's complement, big-endian,
+in the whole bytes that hold the word. `pack_fxp` and `unpack_fxp` read and write that form.
+
+```python
+from decimal import Decimal
+
+from lvfxp import FxpSpec, pack_fxp, unpack_fxp
+
+pack_fxp(Decimal("-16"), 8, 5)  # b"\x80"
+unpack_fxp(b"\x80", 8, 5)  # Decimal("-16")
+unpack_fxp(b"\xff\xff", 16, 16)  # Decimal("-1")
+
+# A reusable spec packs, unpacks and runs over batches.
+spec = FxpSpec(word_length=8, integer_word_length=5)
+spec.byte_length  # 1
+spec.pack(Decimal("15.875"))  # b"\x7f"
+spec.encode_many([Decimal("1"), Decimal("-1")])  # [8, 248]
+```
+
+`byte_length` is `ceil(word_length / 8)`. `pack` writes the unused high bits of the most
+significant byte as zero; `unpack` ignores those bits, so a word another tool sign-extended
+to fill whole bytes still decodes to the same value.
+
+## Command line
+
+Installing the package adds an `lvfxp` command.
+
+```
+$ lvfxp encode 15.875 --wl 8 --iwl 5
+7f
+$ lvfxp encode 16 --wl 8 --iwl 5 --clamp
+7f
+$ lvfxp decode 80 --wl 8 --iwl 5
+-16.000
+$ lvfxp decode --word 128 --wl 8 --iwl 5 --unsigned
+16.000
+```
+
+`encode` prints the flattened hex, or the integer word with `--word`. `decode` reads hex,
+or an integer with `--word`. Both take `--wl`, `--iwl`, `--unsigned`, `--delta` and
+`--offset`; run `lvfxp --help` for the full list. Errors print to stderr with exit code 1.
 
 ## Why
 

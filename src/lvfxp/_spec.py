@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 
@@ -126,6 +127,52 @@ class FxpSpec:
             raise FxpError(f"word {word} does not fit {self.word_length} bits")
         coded = word - span if self.signed and word > self._coded_max else word
         return self._scale(coded)
+
+    @property
+    def byte_length(self) -> int:
+        """Whole bytes needed to flatten the word, big-endian, as LabVIEW does."""
+        return (self.word_length + 7) // 8
+
+    def pack(
+        self,
+        value: Number,
+        *,
+        clamp: bool = False,
+        rounding: str = ROUND_HALF_EVEN,
+    ) -> bytes:
+        """Encode ``value`` and flatten it to big-endian bytes.
+
+        The word fills :attr:`byte_length` bytes; any bits above ``word_length`` in the
+        most significant byte are written as zero. See :meth:`encode` for ``clamp`` and
+        ``rounding``.
+        """
+        word = self.encode(value, clamp=clamp, rounding=rounding)
+        return word.to_bytes(self.byte_length, "big")
+
+    def unpack(self, data: bytes | bytearray) -> Decimal:
+        """Decode a big-endian flattened word of exactly :attr:`byte_length` bytes.
+
+        Bits above ``word_length`` in the most significant byte are ignored, so a word
+        that a producer sign-extended into whole bytes decodes to the same value.
+        """
+        if len(data) != self.byte_length:
+            raise FxpError(f"expected {self.byte_length} bytes, got {len(data)}")
+        word = int.from_bytes(data, "big") & ((1 << self.word_length) - 1)
+        return self.decode(word)
+
+    def encode_many(
+        self,
+        values: Iterable[Number],
+        *,
+        clamp: bool = False,
+        rounding: str = ROUND_HALF_EVEN,
+    ) -> list[int]:
+        """Encode each value with :meth:`encode`, reusing this layout."""
+        return [self.encode(value, clamp=clamp, rounding=rounding) for value in values]
+
+    def decode_many(self, words: Iterable[int]) -> list[Decimal]:
+        """Decode each word with :meth:`decode`, reusing this layout."""
+        return [self.decode(word) for word in words]
 
     def _fit(self, coded: int, clamp: bool) -> int:
         low, high = self._coded_min, self._coded_max

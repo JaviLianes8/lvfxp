@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0]
+
+- Flattened byte codec: `pack_fxp` and `unpack_fxp`, plus `FxpSpec.pack`, `FxpSpec.unpack`
+  and `FxpSpec.byte_length`, read and write the big-endian two's-complement word LabVIEW
+  stores, including non-byte-aligned widths.
+- `FxpSpec.encode_many` and `FxpSpec.decode_many` apply one layout to many values.
+- New `lvfxp` command line tool with `encode` and `decode` subcommands and `--version`.
+
 ## [0.1.0]
 
 - First release: encode and decode LabVIEW fixed-point (FXP) numbers in pure Python.
