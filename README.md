@@ -52,8 +52,11 @@ default (LabVIEW's default coercion), and any `decimal` rounding mode can be pas
 
 ## Why
 
-LabVIEW exchanges fixed-point data through TDMS files, flattened strings and network
-streams, but the Python tools that read those sources do not decode the FXP type:
+Fixed-point is a core LabVIEW datatype, handled natively by LabVIEW's own flatten and
+type-descriptor machinery (there is no separate OpenG FXP package); that machinery runs
+inside LabVIEW only. LabVIEW exchanges fixed-point data through TDMS files, flattened
+strings and network streams, but the Python tools that read those sources do not decode
+the FXP type:
 [autolv](https://pypi.org/project/autolv/) states fixed-point is not supported, and
 [npTDMS](https://pypi.org/project/npTDMS/) lists it among its unsupported types. General
 fixed-point maths packages such as `fxpmath` and `fixedpoint` implement their own
