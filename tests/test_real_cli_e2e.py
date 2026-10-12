@@ -20,6 +20,8 @@ import pytest
 import lvfxp
 
 _ROOT = Path(__file__).resolve().parents[1]
+_LEAKY = ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "PYTHONSTARTUP")
+_ENV = {key: value for key, value in os.environ.items() if key.upper() not in _LEAKY}
 _CAPTURE = _ROOT / "tests" / "fixtures" / "labview2026" / "datalog_fixed_point_cast_i8_m27.dat"
 
 
@@ -29,15 +31,17 @@ def script(tmp_path_factory: pytest.TempPathFactory) -> str:
     build = [sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps"]
     if importlib.util.find_spec("hatchling") is not None:
         build.append("--no-build-isolation")
-    subprocess.run([*build, "-w", str(wheels), str(_ROOT)], check=True, timeout=600)
+    subprocess.run([*build, "-w", str(wheels), str(_ROOT)], check=True, timeout=600, env=_ENV)
     (wheel,) = wheels.glob("lvfxp-*.whl")
     env_dir = tmp_path_factory.mktemp("venv")
     venv.EnvBuilder(with_pip=True).create(env_dir)
     scripts = env_dir / ("Scripts" if os.name == "nt" else "bin")
     install = [str(scripts / "python"), "-m", "pip", "install", "--quiet", "--no-index"]
-    subprocess.run([*install, "--no-deps", str(wheel)], check=True, timeout=600)
+    subprocess.run([*install, "--no-deps", str(wheel)], check=True, timeout=600, env=_ENV)
     where = [str(scripts / "python"), "-c", "import lvfxp; print(lvfxp.__file__)"]
-    location = subprocess.run(where, check=True, capture_output=True, text=True, cwd=env_dir)
+    location = subprocess.run(
+        where, check=True, capture_output=True, text=True, cwd=env_dir, env=_ENV
+    )
     assert Path(location.stdout.strip()).resolve().is_relative_to(env_dir.resolve())
     found = shutil.which("lvfxp", path=str(scripts))
     assert found is not None, "pip did not install the lvfxp console script"
@@ -45,7 +49,7 @@ def script(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 
 def _run(script: str, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([script, *args], capture_output=True, text=True, timeout=60)
+    return subprocess.run([script, *args], capture_output=True, text=True, timeout=60, env=_ENV)
 
 
 def test_version_comes_from_the_installed_package(script: str) -> None:

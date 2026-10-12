@@ -51,8 +51,8 @@ overflow-status form is unsupported.
 
 ## 7. Contract and real end-to-end tests (done)
 
-A contract test sweeps every word of every layout up to 8 bits (signed and unsigned,
-several integer word lengths) through value math, both byte forms and the array form. The
+A contract test sweeps every word of each word length up to 8 bits (signed and unsigned,
+at several integer word lengths) through value math, both byte forms and the array form. The
 real-capture test decodes the LabVIEW 2026 datalog bytes. The end-to-end test builds a wheel,
 installs it into a throwaway virtual environment and drives the generated `lvfxp` script.
 
@@ -61,5 +61,5 @@ installs it into a throwaway virtual environment and drives the generated `lvfxp
 - Overflow-status form (72 bits): add only once a real capture shows where the status
   byte sits and how it is encoded.
 - Integer word length bounds: LabVIEW limits them, but the exact range is not verified
-  here, so lvfxp does not enforce one.
+  here, so lvfxp enforces only its own wider bound of -4096 to 4096.
 - Little-endian helpers for consumers that byte-swap after flattening.

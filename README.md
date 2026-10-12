@@ -16,7 +16,8 @@ says how to read it: `<signed, word length, integer word length>`. The word hold
 `word length` bits (1 to 64, two's complement when signed), and the integer word length
 fixes where the binary point sits. The real value is the word read as an integer times the
 resolution `2 ** (integer word length - word length)`. The integer word length may exceed
-the word length or go negative. A general fixed-point layout may instead carry an explicit
+the word length or go negative; lvfxp accepts -4096 to 4096 (its own bound, not
+LabVIEW's, which keeps exact values a sane size). A general fixed-point layout may instead carry an explicit
 delta (resolution) and offset, giving `offset + word * delta`.
 
 ## Usage
@@ -33,7 +34,7 @@ value = from_fxp(word, 8, 5)  # Decimal("15.875")
 # A spec exposes the resolution and the representable range.
 spec = FxpSpec(word_length=8, integer_word_length=5, signed=True)
 spec.resolution  # Decimal("0.125")
-spec.min_value, spec.max_value  # (Decimal("-16"), Decimal("15.875"))
+spec.min_value, spec.max_value  # (Decimal("-16.000"), Decimal("15.875"))
 
 # General fixed-point with an explicit delta and offset.
 FxpSpec(8, 8, signed=False, delta=Decimal("0.1"), offset=Decimal("1")).decode(5)  # Decimal("1.5")
@@ -41,8 +42,9 @@ FxpSpec(8, 8, signed=False, delta=Decimal("0.1"), offset=Decimal("1")).decode(5)
 
 Decoding returns a `Decimal` that is exact at every width, including the `2 ** -64`
 resolution of a `<64, 0>` word. Floats are read through their shortest repr, so `0.1`
-means `Decimal("0.1")`. Bad input (text that is not a number, NaN, infinity, a word that
-does not fit) raises `FxpError`, a `ValueError`.
+means `Decimal("0.1")`. Bad input (text that is not a number, NaN, infinity, a decimal exponent
+beyond +/-10000, a word that does not fit, data that is not bytes) raises `FxpError`, a
+`ValueError`.
 
 ## Rounding and overflow
 
@@ -99,7 +101,8 @@ different word length or signedness raise instead of decoding to a wrong value.
 
 - **Value math: verified.** Word length, integer word length, signedness, the scaling
   `2 ** (iwl - wl)`, rounding and overflow follow NI's documentation, and a contract test
-  checks every word of every layout up to 8 bits against independent rational arithmetic.
+  checks every word of each word length up to 8 bits, at several integer word lengths,
+  against independent rational arithmetic.
 - **8-byte layout: verified.** NI documents the 64-bit, sign-extended format and
   big-endian flattening, and its numeric table gives fixed-point 64 bits of storage on
   disk. A real LabVIEW 2026 capture agrees byte for byte: front-panel datalog records
@@ -150,7 +153,8 @@ compact bytes: 1
 `decode` reads flattened hex, compact hex with `--compact`, or an integer with `--word`, and
 prints the exact value in plain notation. Every command takes `--wl`, `--iwl`,
 `--unsigned`, `--delta` and `--offset`; `lvfxp --help` lists runnable examples. Data errors
-print to stderr with exit code 1; usage errors exit 2.
+print to stderr with exit code 1; usage errors exit 2. Put `--` before a negative value
+in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0`.
 
 ## Why
 

@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from . import __version__
 from ._errors import FxpError
+from ._numbers import as_decimal
 from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE, OVERFLOW_MODES
 from ._spec import EncodeOptions, FxpSpec
 
@@ -37,6 +38,7 @@ Flattened bytes are LabVIEW's form: 8 bytes, big-endian, the word in the low bit
 extended when signed and zero extended when unsigned. --compact uses ceil(wl / 8) bytes
 instead, a dense form that LabVIEW itself does not read or write. Values with an overflow
 status (9 bytes in LabVIEW) are not supported. Data errors print to stderr and exit 1.
+Put -- before a negative value in scientific notation: lvfxp encode --wl 8 --iwl 5 -- -1e0
 """
 
 
@@ -134,9 +136,15 @@ def _run_decode(args: argparse.Namespace) -> str:
 def _run_info(args: argparse.Namespace) -> str:
     spec = _spec(args)
     sign = "+/-" if spec.signed else "+"
+    if spec.delta is None:
+        layout = [f"layout: <{sign}, {spec.word_length}, {spec.integer_word_length}>"]
+    else:
+        layout = [f"layout: <{sign}, {spec.word_length}> with an explicit delta"]
+    if spec.offset != 0:
+        layout.append(f"offset: {_plain(as_decimal(spec.offset))}")
     return "\n".join(
         [
-            f"layout: <{sign}, {spec.word_length}, {spec.integer_word_length}>",
+            *layout,
             f"resolution: {_plain(spec.resolution)}",
             f"minimum: {_plain(spec.min_value)}",
             f"maximum: {_plain(spec.max_value)}",

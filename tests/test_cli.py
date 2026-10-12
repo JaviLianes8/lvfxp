@@ -88,3 +88,28 @@ def test_usage_errors_exit_two(capsys: pytest.CaptureFixture[str]) -> None:
         main(["encode", "1", "--wl", "8", "--iwl", "5", "--word", "--compact"])
     assert raised.value.code == 2
     assert "not allowed with" in capsys.readouterr().err
+
+
+def test_info_names_an_explicit_delta_and_offset(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, _ = _run(
+        capsys, "info", "--wl", "8", "--iwl", "5", "--delta", "0.1", "--offset", "1"
+    )
+    assert code == 0
+    assert out.splitlines()[:3] == [
+        "layout: <+/-, 8> with an explicit delta",
+        "offset: 1",
+        "resolution: 0.1",
+    ]
+
+
+def test_double_dash_passes_a_negative_exponent_value(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "encode", "--wl", "8", "--iwl", "5", "--", "-1e0") == (
+        0,
+        "fffffffffffffff8",
+        "",
+    )
+
+
+def test_out_of_bound_input_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "info", "--wl", "8", "--iwl", "-100000000")[0] == 1
+    assert _run(capsys, "encode", "1e999999999", "--wl", "8", "--iwl", "5")[0] == 1
