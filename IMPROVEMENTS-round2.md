@@ -53,8 +53,8 @@ overflow-status form is unsupported.
 
 A contract test sweeps every word of every layout up to 8 bits (signed and unsigned,
 several integer word lengths) through value math, both byte forms and the array form. The
-real-capture test decodes the LabVIEW 2026 datalog bytes. The end-to-end test installs the
-package editable and drives the generated `lvfxp` console script.
+real-capture test decodes the LabVIEW 2026 datalog bytes. The end-to-end test builds a wheel,
+installs it into a throwaway virtual environment and drives the generated `lvfxp` script.
 
 ## 8. Open
 

@@ -1,17 +1,16 @@
-"""Real end-to-end: install the package editable and drive the generated ``lvfxp`` script.
+"""Real end-to-end: build a wheel, pip-install it into a throwaway venv, run its ``lvfxp``.
 
 No imports of the CLI module and no mocks: every test shells out to the console script pip
-created. Inside a virtual environment the project is installed into it; otherwise a
-throwaway virtual environment is built first.
+generated inside a fresh virtual environment that shares nothing with the test runner.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
-import sysconfig
 import venv
 from decimal import Decimal
 from pathlib import Path
@@ -26,16 +25,20 @@ _CAPTURE = _ROOT / "tests" / "fixtures" / "labview2026" / "datalog_fixed_point_c
 
 @pytest.fixture(scope="module")
 def script(tmp_path_factory: pytest.TempPathFactory) -> str:
-    if sys.prefix != sys.base_prefix:
-        python, scripts = sys.executable, Path(sysconfig.get_path("scripts"))
-        extra = ["--no-build-isolation"]
-    else:
-        env_dir = tmp_path_factory.mktemp("venv")
-        venv.EnvBuilder(with_pip=True).create(env_dir)
-        scripts = env_dir / ("Scripts" if os.name == "nt" else "bin")
-        python, extra = str(scripts / "python"), []
-    command = [python, "-m", "pip", "install", "--quiet", "--no-deps", *extra, "-e", str(_ROOT)]
-    subprocess.run(command, check=True, capture_output=True, timeout=600)
+    wheels = tmp_path_factory.mktemp("wheels")
+    build = [sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps"]
+    if importlib.util.find_spec("hatchling") is not None:
+        build.append("--no-build-isolation")
+    subprocess.run([*build, "-w", str(wheels), str(_ROOT)], check=True, timeout=600)
+    (wheel,) = wheels.glob("lvfxp-*.whl")
+    env_dir = tmp_path_factory.mktemp("venv")
+    venv.EnvBuilder(with_pip=True).create(env_dir)
+    scripts = env_dir / ("Scripts" if os.name == "nt" else "bin")
+    install = [str(scripts / "python"), "-m", "pip", "install", "--quiet", "--no-index"]
+    subprocess.run([*install, "--no-deps", str(wheel)], check=True, timeout=600)
+    where = [str(scripts / "python"), "-c", "import lvfxp; print(lvfxp.__file__)"]
+    location = subprocess.run(where, check=True, capture_output=True, text=True, cwd=env_dir)
+    assert Path(location.stdout.strip()).resolve().is_relative_to(env_dir.resolve())
     found = shutil.which("lvfxp", path=str(scripts))
     assert found is not None, "pip did not install the lvfxp console script"
     return found

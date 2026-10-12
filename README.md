@@ -105,7 +105,9 @@ different word length or signedness raise instead of decoding to a wrong value.
   disk. A real LabVIEW 2026 capture agrees byte for byte: front-panel datalog records
   written by the shipped `Fixed-Point Cast.vi` example store each fixed-point value as 8
   big-endian bytes, signed words sign extended and an unsigned `<+, 10, 4>` word with its
-  top bit set zero extended (`tests/fixtures/labview2026`).
+  top bit set zero extended (`tests/fixtures/labview2026`). The output of the Flatten To
+  String function itself was not captured; NI Community reports of 8-byte flattened
+  fixed-point strings (see Sources) match the same form.
 - **1-D arrays: derived, not captured.** `pack_array`/`unpack_array` combine NI's
   documented array rule (a 32-bit count, then the elements) with the verified 8-byte
   element.
