@@ -21,6 +21,9 @@ LabVIEW data.
   overflow status, whose layout NI does not document) with an explanatory error.
 - `FxpSpec.byte_length` is now always 8.
 - `FxpSpec` accepts word lengths from 1 to 64 only, LabVIEW's limits.
+- `FxpSpec` accepts integer word lengths from -4096 to 4096 (a library bound), and
+  numbers with a decimal exponent beyond +/-10000 raise `FxpError`, so no input can make
+  exact arithmetic run without bound.
 - The CLI prints and reads the 8-byte form; `--rounding` now takes LabVIEW's names
   (`half-even`, `half-up`, `truncate`), and `decode` prints exact plain notation.
 
@@ -31,11 +34,13 @@ LabVIEW data.
 - `FxpSpec.pack_array` and `FxpSpec.unpack_array` for flattened 1-D arrays.
 - LabVIEW rounding constants `LV_ROUND_HALF_EVEN`, `LV_ROUND_HALF_UP` (ties toward positive
   infinity) and `LV_TRUNCATE`, plus `overflow="raise" | "saturate" | "wrap"`.
-- `FLATTENED_SIZE`, `MAX_WORD_LENGTH` and the `EncodeOptions` typed keyword options.
+- `FLATTENED_SIZE`, `MAX_WORD_LENGTH`, `MAX_INTEGER_WORD_LENGTH` and the `EncodeOptions` typed keyword options.
 - CLI: `info` command, `--compact`, `--overflow`.
 
 ### Fixed
 
+- A non-bool `clamp`, a non-string `rounding` or `overflow`, and non-bytes data now raise
+  `FxpError` instead of being accepted or leaking `TypeError`.
 - Resolutions finer than about `2 ** -40` were rounded to 28 significant digits; they are
   now exact.
 - Rounding is exact over rationals, so an explicit `delta` can no longer double-round near

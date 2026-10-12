@@ -45,13 +45,15 @@ _HALF = Fraction(1, 2)
 
 
 def check_rounding(rounding: str) -> None:
-    if rounding not in ROUNDING_MODES:
+    if not isinstance(rounding, str) or rounding not in ROUNDING_MODES:
         raise FxpError(f"unknown rounding mode {rounding!r}")
 
 
 def overflow_mode(clamp: bool, overflow: str) -> str:
     """Resolve the legacy ``clamp`` flag and the ``overflow`` name into one mode."""
-    if overflow not in OVERFLOW_MODES:
+    if not isinstance(clamp, bool):
+        raise FxpError("clamp must be a bool")
+    if not isinstance(overflow, str) or overflow not in OVERFLOW_MODES:
         raise FxpError(f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {overflow!r}")
     if clamp:
         if overflow == "wrap":

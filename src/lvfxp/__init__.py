@@ -13,7 +13,7 @@ from ._codec import (
 from ._errors import FxpError, FxpOverflowError
 from ._flat import FLATTENED_SIZE
 from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE
-from ._spec import MAX_WORD_LENGTH, EncodeOptions, FxpSpec
+from ._spec import MAX_INTEGER_WORD_LENGTH, MAX_WORD_LENGTH, EncodeOptions, FxpSpec
 
 __version__ = "0.3.0"
 
@@ -22,6 +22,7 @@ __all__ = [
     "LV_ROUND_HALF_EVEN",
     "LV_ROUND_HALF_UP",
     "LV_TRUNCATE",
+    "MAX_INTEGER_WORD_LENGTH",
     "MAX_WORD_LENGTH",
     "EncodeOptions",
     "FxpError",

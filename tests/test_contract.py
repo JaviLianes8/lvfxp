@@ -2,7 +2,7 @@
 
 Expected results are computed here independently, with ``fractions.Fraction`` and plain
 integer arithmetic, never by calling the library twice. The sweep covers every word of
-every layout up to 8 bits, signed and unsigned, at several integer word lengths.
+each word length up to 8 bits, signed and unsigned, at several integer word lengths.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ PUBLIC_API: list[str] = [
     "LV_ROUND_HALF_EVEN",
     "LV_ROUND_HALF_UP",
     "LV_TRUNCATE",
+    "MAX_INTEGER_WORD_LENGTH",
     "MAX_WORD_LENGTH",
     "EncodeOptions",
     "FxpError",

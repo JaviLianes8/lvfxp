@@ -19,6 +19,11 @@ _COUNT_SIZE = 4
 _MAX_COUNT = (1 << 31) - 1
 
 
+def _check_bytes(data: object) -> None:
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise FxpError(f"expected bytes, not {type(data).__name__}")
+
+
 def _coded(word: int, word_length: int, signed: bool) -> int:
     if signed and word >> (word_length - 1):
         return word - (1 << word_length)
@@ -50,6 +55,7 @@ def unflatten_word(data: bytes | bytearray, word_length: int, signed: bool) -> i
     The bits above the word must be its sign extension (zeros when unsigned), as LabVIEW
     writes them; anything else means the bytes belong to another layout.
     """
+    _check_bytes(data)
     if len(data) != FLATTENED_SIZE:
         raise _size_error(len(data))
     raw = int.from_bytes(data, "big", signed=signed)
@@ -71,6 +77,7 @@ def compact_word(word: int, word_length: int) -> bytes:
 
 def uncompact_word(data: bytes | bytearray, word_length: int) -> int:
     """Read a compact word, ignoring any bits above ``word_length``."""
+    _check_bytes(data)
     size = compact_size(word_length)
     if len(data) != size:
         raise FxpError(f"expected {size} compact bytes, got {len(data)}")
@@ -87,6 +94,7 @@ def flatten_array(words: Iterable[int], word_length: int, signed: bool) -> bytes
 
 def unflatten_array(data: bytes | bytearray, word_length: int, signed: bool) -> list[int]:
     """Read a flattened 1-D array back into unsigned words; the length must match exactly."""
+    _check_bytes(data)
     if len(data) < _COUNT_SIZE:
         raise FxpError(f"a flattened array starts with a {_COUNT_SIZE}-byte count")
     count = int.from_bytes(data[:_COUNT_SIZE], "big", signed=True)

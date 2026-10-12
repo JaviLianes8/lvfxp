@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 MAX_WORD_LENGTH = 64
 """LabVIEW fixed-point words hold between 1 and 64 bits."""
 
+MAX_INTEGER_WORD_LENGTH = 4096
+"""lvfxp's own bound on ``abs(integer_word_length)``, keeping exact values a sane size."""
+
 
 class EncodeOptions(TypedDict, total=False):
     """Keyword options shared by every encoding method (see :meth:`FxpSpec.encode`)."""
@@ -47,7 +50,10 @@ class FxpSpec:
     def __post_init__(self) -> None:
         if not 1 <= as_int(self.word_length, "word_length") <= MAX_WORD_LENGTH:
             raise FxpError(f"word_length must be between 1 and {MAX_WORD_LENGTH}")
-        as_int(self.integer_word_length, "integer_word_length")
+        iwl = as_int(self.integer_word_length, "integer_word_length")
+        if abs(iwl) > MAX_INTEGER_WORD_LENGTH:
+            bound = MAX_INTEGER_WORD_LENGTH
+            raise FxpError(f"integer_word_length must be between -{bound} and {bound}")
         if not isinstance(self.signed, bool):
             raise FxpError("signed must be a bool")
         object.__setattr__(self, "offset", as_decimal(self.offset, "offset"))

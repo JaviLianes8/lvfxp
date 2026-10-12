@@ -9,12 +9,16 @@ from ._errors import FxpError
 
 Number = int | float | Decimal | str
 
+MAX_EXPONENT = 10_000
+"""Largest decimal exponent accepted, so exact arithmetic stays bounded in time and memory."""
+
 
 def as_decimal(value: object, name: str = "value") -> Decimal:
     """Return ``value`` as a finite Decimal, without inheriting binary float noise.
 
     A float is read through its shortest repr, so ``0.1`` becomes ``Decimal("0.1")``.
-    Booleans, non-numeric text, NaN and infinities raise :class:`FxpError`.
+    Booleans, non-numeric text, NaN, infinities and decimal exponents beyond
+    ``MAX_EXPONENT`` raise :class:`FxpError`.
     """
     if isinstance(value, bool):
         raise FxpError(f"{name} must be a number, not a bool")
@@ -31,6 +35,11 @@ def as_decimal(value: object, name: str = "value") -> Decimal:
         raise FxpError(f"{name} must be int, float, Decimal or str, not {type(value).__name__}")
     if not result.is_finite():
         raise FxpError(f"{name} must be finite, got {value!r}")
+    exponent = int(result.as_tuple().exponent)
+    if result.is_zero():
+        return result if abs(exponent) <= MAX_EXPONENT else Decimal(0)
+    if max(abs(exponent), abs(result.adjusted())) > MAX_EXPONENT:
+        raise FxpError(f"{name} needs a decimal exponent beyond +/-{MAX_EXPONENT}")
     return result
 
 
