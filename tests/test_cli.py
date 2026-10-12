@@ -1,95 +1,115 @@
-"""End to end tests that run the real installed ``lvfxp`` console script.
+"""In-process tests of the command line parser and output (the real script: e2e test)."""
 
-These need the package installed (``pip install -e .``) so the entry point exists. They
-drive the actual executable through ``subprocess`` and check real stdout and exit codes.
-"""
-
-import shutil
-import subprocess
-import sys
-import sysconfig
-from decimal import Decimal
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
-
-def _console_script() -> str:
-    found = shutil.which("lvfxp")
-    if found:
-        return found
-    name = "lvfxp.exe" if sys.platform == "win32" else "lvfxp"
-    candidate = Path(sysconfig.get_path("scripts")) / name
-    if candidate.exists():
-        return str(candidate)
-    pytest.skip("lvfxp console script not installed; run 'pip install -e .'")
+from lvfxp._cli import _EXAMPLES, main
 
 
-LVFXP = _console_script()
+def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]:
+    code = main(list(args))
+    out, err = capsys.readouterr()
+    return code, out.strip(), err.strip()
 
 
-def _run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([LVFXP, *args], capture_output=True, text=True, check=False)
+def _examples() -> list[tuple[list[str], str]]:
+    rows = []
+    for line in _EXAMPLES.splitlines():
+        if line.startswith("  lvfxp ") and "->" in line:
+            command, expected = line.split("->")
+            rows.append((command.split()[1:], expected.strip()))
+    return rows
 
 
-def test_version_prints_the_release() -> None:
-    result = _run("--version")
-    assert result.returncode == 0
-    assert result.stdout.strip() == "lvfxp 0.2.0"
+@pytest.mark.parametrize(("args", "expected"), _examples())
+def test_every_help_example_prints_what_it_claims(
+    capsys: pytest.CaptureFixture[str], args: list[str], expected: str
+) -> None:
+    assert _run(capsys, *args) == (0, expected, "")
 
 
-def test_encode_prints_the_flattened_hex() -> None:
-    result = _run("encode", "15.875", "--wl", "8", "--iwl", "5")
-    assert result.returncode == 0
-    assert result.stdout.strip() == "7f"
+def test_info_describes_the_layout(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, _ = _run(capsys, "info", "--wl", "10", "--iwl", "4", "--unsigned")
+    assert code == 0
+    assert out.splitlines() == [
+        "layout: <+, 10, 4>",
+        "resolution: 0.015625",
+        "minimum: 0",
+        "maximum: 15.984375",
+        "flattened bytes: 8",
+        "compact bytes: 2",
+    ]
 
 
-def test_encode_word_flag_prints_the_integer() -> None:
-    result = _run("encode", "-2.5", "--wl", "4", "--iwl", "3", "--word")
-    assert result.returncode == 0
-    assert result.stdout.strip() == "11"
+def test_decode_prints_plain_exact_digits(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, _ = _run(capsys, "decode", "--word", "1", "--wl", "64", "--iwl", "0")
+    assert code == 0
+    assert out == "0.0000000000000000000542101086242752217003726400434970855712890625"
 
 
-def test_encode_clamp_saturates() -> None:
-    result = _run("encode", "16", "--wl", "8", "--iwl", "5", "--clamp")
-    assert result.returncode == 0
-    assert result.stdout.strip() == "7f"
+def test_clamp_is_kept_as_an_alias(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "encode", "99", "--wl", "8", "--iwl", "5", "--clamp")[1] == (
+        "000000000000007f"
+    )
 
 
-def test_decode_a_real_twos_complement_word() -> None:
-    result = _run("decode", "80", "--wl", "8", "--iwl", "5")
-    assert result.returncode == 0
-    assert Decimal(result.stdout.strip()) == Decimal("-16")
+def test_hex_accepts_prefix_spaces_and_underscores(capsys: pytest.CaptureFixture[str]) -> None:
+    out = _run(capsys, "decode", "0xffff ffff_ffff ff80", "--wl", "8", "--iwl", "5")[1]
+    assert out == "-16"
 
 
-def test_decode_word_flag_and_unsigned() -> None:
-    result = _run("decode", "--word", "128", "--wl", "8", "--iwl", "5", "--unsigned")
-    assert result.returncode == 0
-    assert Decimal(result.stdout.strip()) == Decimal("16")
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["encode", "16", "--wl", "8", "--iwl", "5"], "outside"),
+        (["encode", "abc", "--wl", "8", "--iwl", "5"], "not a number"),
+        (["encode", "1", "--wl", "65", "--iwl", "5"], "between 1 and 64"),
+        (["decode", "zz", "--wl", "8", "--iwl", "5"], "not valid hex"),
+        (["decode", "80", "--wl", "8", "--iwl", "5"], "8 bytes, got 1"),
+        (["decode", "00" * 9, "--wl", "8", "--iwl", "5"], "overflow status"),
+        (["decode", "00000000000000ff", "--wl", "8", "--iwl", "5"], "extended"),
+        (["decode", "--wl", "8", "--iwl", "5"], "use --word"),
+        (["decode", "7f", "--word", "1", "--wl", "8", "--iwl", "5"], "not both"),
+        (["encode", "1", "--wl", "8", "--iwl", "5", "--clamp", "--overflow", "wrap"], "wrap"),
+    ],
+)
+def test_data_errors_go_to_stderr_with_exit_one(
+    capsys: pytest.CaptureFixture[str], args: list[str], message: str
+) -> None:
+    code, out, err = _run(capsys, *args)
+    assert (code, out) == (1, "")
+    assert err.startswith("lvfxp: ")
+    assert message in err
 
 
-def test_cli_round_trip_through_the_executable() -> None:
-    encoded = _run("encode", "-1", "--wl", "16", "--iwl", "16").stdout.strip()
-    assert encoded == "ffff"
-    decoded = _run("decode", encoded, "--wl", "16", "--iwl", "16").stdout.strip()
-    assert Decimal(decoded) == Decimal("-1")
+def test_usage_errors_exit_two(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["encode", "1", "--wl", "8", "--iwl", "5", "--word", "--compact"])
+    assert raised.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
 
 
-def test_overflow_error_goes_to_stderr_with_exit_one() -> None:
-    result = _run("encode", "16", "--wl", "8", "--iwl", "5")
-    assert result.returncode == 1
-    assert result.stdout == ""
-    assert "lvfxp:" in result.stderr
+def test_info_names_an_explicit_delta_and_offset(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, _ = _run(
+        capsys, "info", "--wl", "8", "--iwl", "5", "--delta", "0.1", "--offset", "1"
+    )
+    assert code == 0
+    assert out.splitlines()[:3] == [
+        "layout: <+/-, 8> with an explicit delta",
+        "offset: 1",
+        "resolution: 0.1",
+    ]
 
 
-def test_bad_hex_is_reported_on_stderr() -> None:
-    result = _run("decode", "zz", "--wl", "8", "--iwl", "5")
-    assert result.returncode == 1
-    assert "not valid hex" in result.stderr
+def test_double_dash_passes_a_negative_exponent_value(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "encode", "--wl", "8", "--iwl", "5", "--", "-1e0") == (
+        0,
+        "fffffffffffffff8",
+        "",
+    )
 
 
-def test_help_lists_runnable_examples() -> None:
-    result = _run("--help")
-    assert result.returncode == 0
-    assert "examples:" in result.stdout
-    assert "lvfxp encode" in result.stdout
+def test_out_of_bound_input_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "info", "--wl", "8", "--iwl", "-100000000")[0] == 1
+    assert _run(capsys, "encode", "1e999999999", "--wl", "8", "--iwl", "5")[0] == 1

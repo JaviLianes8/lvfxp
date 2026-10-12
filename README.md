@@ -1,6 +1,7 @@
 # lvfxp
 
-Encode and decode LabVIEW fixed-point (FXP) numbers in pure Python
+Encode and decode LabVIEW fixed-point (FXP) numbers and their flattened bytes, exactly, in
+pure Python.
 
 ## Install
 
@@ -10,14 +11,14 @@ pip install lvfxp
 
 ## What is a LabVIEW fixed-point number
 
-A LabVIEW fixed-point (FXP) number stores a real value as a plain integer word plus a
-layout that says how to read it: `<signed, word length, integer word length>`. The word
-holds `word length` bits (two's complement when signed), and the integer word length
-fixes where the binary point sits. The real value is the word read as an integer,
-multiplied by the resolution `2 ** (integer word length - word length)`. The integer word
-length may exceed the word length or go negative, so the same bits can describe very large
-or very small numbers; LabVIEW keeps only the bits that fit. A general FXP may also carry
-an explicit delta (resolution) and offset, giving `offset + word * delta`.
+A LabVIEW fixed-point number stores a real value as an integer word plus a layout that
+says how to read it: `<signed, word length, integer word length>`. The word holds
+`word length` bits (1 to 64, two's complement when signed), and the integer word length
+fixes where the binary point sits. The real value is the word read as an integer times the
+resolution `2 ** (integer word length - word length)`. The integer word length may exceed
+the word length or go negative; lvfxp accepts -4096 to 4096 (its own bound, not
+LabVIEW's, which keeps exact values a sane size). A general fixed-point layout may instead carry an explicit
+delta (resolution) and offset, giving `offset + word * delta`.
 
 ## Usage
 
@@ -30,50 +31,98 @@ from lvfxp import FxpSpec, from_fxp, to_fxp
 word = to_fxp(Decimal("15.875"), 8, 5)  # 127 (0x7F)
 value = from_fxp(word, 8, 5)  # Decimal("15.875")
 
-# Negative values round-trip through two's complement.
-from_fxp(to_fxp(Decimal("-2.5"), 4, 3), 4, 3)  # Decimal("-2.5")
-
 # A spec exposes the resolution and the representable range.
 spec = FxpSpec(word_length=8, integer_word_length=5, signed=True)
 spec.resolution  # Decimal("0.125")
-spec.min_value  # Decimal("-16")
-spec.max_value  # Decimal("15.875")
-
-# Out-of-range values raise by default, or saturate when you ask them to.
-to_fxp(Decimal("16"), 8, 5, clamp=True)  # 127
+spec.min_value, spec.max_value  # (Decimal("-16.000"), Decimal("15.875"))
 
 # General fixed-point with an explicit delta and offset.
 FxpSpec(8, 8, signed=False, delta=Decimal("0.1"), offset=Decimal("1")).decode(5)  # Decimal("1.5")
 ```
 
-Decoding returns a `Decimal`, so results stay exact even at tiny resolutions such as
-`2 ** -64`, where a binary float would lose precision. Encoding uses round-half-to-even by
-default (LabVIEW's default coercion), and any `decimal` rounding mode can be passed.
+Decoding returns a `Decimal` that is exact at every width, including the `2 ** -64`
+resolution of a `<64, 0>` word. Floats are read through their shortest repr, so `0.1`
+means `Decimal("0.1")`. Bad input (text that is not a number, NaN, infinity, a decimal exponent
+beyond +/-10000, a word that does not fit, data that is not bytes) raises `FxpError`, a
+`ValueError`.
+
+## Rounding and overflow
+
+Encoding rounds exactly, over rationals, so no mode can double-round near a tie. LabVIEW's
+three rounding modes are provided as constants:
+
+| Constant | LabVIEW mode | Ties |
+| --- | --- | --- |
+| `LV_ROUND_HALF_EVEN` (default) | Round-Half-Even | to the even code |
+| `LV_ROUND_HALF_UP` | Round-Half-Up (asymmetric) | toward positive infinity |
+| `LV_TRUNCATE` | Truncate | always rounds down (drops low bits) |
+
+Any `decimal` rounding mode is accepted too. Note that `decimal.ROUND_HALF_UP` rounds ties
+away from zero, which differs from LabVIEW's Round-Half-Up for negative values.
+
+```python
+from decimal import Decimal
+
+from lvfxp import LV_ROUND_HALF_UP, to_fxp
+
+to_fxp(Decimal("-0.0625"), 8, 5, rounding=LV_ROUND_HALF_UP)  # 0, the tie goes up
+to_fxp(Decimal("16"), 8, 5, overflow="saturate")  # 127, the largest code
+to_fxp(Decimal("16"), 8, 5, overflow="wrap")  # 128 (0x80), the low 8 bits
+```
+
+`overflow` is `"raise"` (the default, `FxpOverflowError`), `"saturate"` or `"wrap"`;
+`clamp=True` is shorthand for `"saturate"`. LabVIEW's To Fixed-Point saturates by default;
+lvfxp raises by default so an out-of-range value never passes silently.
 
 ## Flattened bytes
 
-LabVIEW exchanges a fixed-point number as its coded integer in two's complement, big-endian,
-in the whole bytes that hold the word. `pack_fxp` and `unpack_fxp` read and write that form.
+LabVIEW holds every fixed-point number in a 64-bit format and sign extends it to 64 bits,
+and it flattens numbers big-endian. `pack` and `unpack` read and write that form: 8 bytes,
+the word in the low bits, sign extended when signed and zero extended when unsigned.
 
 ```python
 from decimal import Decimal
 
 from lvfxp import FxpSpec, pack_fxp, unpack_fxp
 
-pack_fxp(Decimal("-16"), 8, 5)  # b"\x80"
-unpack_fxp(b"\x80", 8, 5)  # Decimal("-16")
-unpack_fxp(b"\xff\xff", 16, 16)  # Decimal("-1")
+pack_fxp(Decimal("-16"), 8, 5).hex()  # "ffffffffffffff80"
+unpack_fxp(bytes.fromhex("00000000000003e5"), 10, 4, signed=False)  # Decimal("15.578125")
 
-# A reusable spec packs, unpacks and runs over batches.
 spec = FxpSpec(word_length=8, integer_word_length=5)
-spec.byte_length  # 1
-spec.pack(Decimal("15.875"))  # b"\x7f"
-spec.encode_many([Decimal("1"), Decimal("-1")])  # [8, 248]
+spec.byte_length  # 8
+spec.pack_array([Decimal("1"), Decimal("-1")]).hex()
+# "00000002" "0000000000000008" "fffffffffffffff8": a 32-bit count, then the elements
 ```
 
-`byte_length` is `ceil(word_length / 8)`. `pack` writes the unused high bits of the most
-significant byte as zero; `unpack` ignores those bits, so a word another tool sign-extended
-to fill whole bytes still decodes to the same value.
+`unpack` checks that the high bits are the word's extension, so bytes written for a
+different word length or signedness raise instead of decoding to a wrong value.
+
+### What is verified, and what is not
+
+- **Value math: verified.** Word length, integer word length, signedness, the scaling
+  `2 ** (iwl - wl)`, rounding and overflow follow NI's documentation, and a contract test
+  checks every word of each word length up to 8 bits, at several integer word lengths,
+  against independent rational arithmetic.
+- **8-byte layout: verified.** NI documents the 64-bit, sign-extended format and
+  big-endian flattening, and its numeric table gives fixed-point 64 bits of storage on
+  disk. A real LabVIEW 2026 capture agrees byte for byte: front-panel datalog records
+  written by the shipped `Fixed-Point Cast.vi` example store each fixed-point value as 8
+  big-endian bytes, signed words sign extended and an unsigned `<+, 10, 4>` word with its
+  top bit set zero extended (`tests/fixtures/labview2026`). The output of the Flatten To
+  String function itself was not captured; NI Community reports of 8-byte flattened
+  fixed-point strings (see Sources) match the same form.
+- **1-D arrays: derived, not captured.** `pack_array`/`unpack_array` combine NI's
+  documented array rule (a 32-bit count, then the elements) with the verified 8-byte
+  element.
+- **Overflow status: not supported.** NI gives 72 bits when a fixed-point value includes an
+  overflow status, but does not document where the status byte sits or how it is encoded,
+  and no capture was possible, so lvfxp refuses 9-byte input instead of guessing.
+
+### Compact form (not LabVIEW)
+
+`pack_compact`/`unpack_compact` (and `pack_fxp_compact`/`unpack_fxp_compact`) store the
+word in `ceil(word_length / 8)` big-endian bytes. This is a dense form for your own files
+or links; LabVIEW does not read or write it. Unpacking it ignores bits above the word.
 
 ## Command line
 
@@ -81,18 +130,31 @@ Installing the package adds an `lvfxp` command.
 
 ```
 $ lvfxp encode 15.875 --wl 8 --iwl 5
-7f
-$ lvfxp encode 16 --wl 8 --iwl 5 --clamp
-7f
-$ lvfxp decode 80 --wl 8 --iwl 5
--16.000
+000000000000007f
+$ lvfxp encode 16 --wl 8 --iwl 5 --overflow saturate
+000000000000007f
+$ lvfxp decode ffffffffffffff80 --wl 8 --iwl 5
+-16
+$ lvfxp decode 7f --wl 8 --iwl 5 --compact
+15.875
 $ lvfxp decode --word 128 --wl 8 --iwl 5 --unsigned
-16.000
+16
+$ lvfxp info --wl 8 --iwl 5
+layout: <+/-, 8, 5>
+resolution: 0.125
+minimum: -16
+maximum: 15.875
+flattened bytes: 8
+compact bytes: 1
 ```
 
-`encode` prints the flattened hex, or the integer word with `--word`. `decode` reads hex,
-or an integer with `--word`. Both take `--wl`, `--iwl`, `--unsigned`, `--delta` and
-`--offset`; run `lvfxp --help` for the full list. Errors print to stderr with exit code 1.
+`encode` prints the flattened hex, the integer word with `--word`, or the compact hex with
+`--compact`; it takes `--overflow`, `--clamp` and `--rounding half-even|half-up|truncate`.
+`decode` reads flattened hex, compact hex with `--compact`, or an integer with `--word`, and
+prints the exact value in plain notation. Every command takes `--wl`, `--iwl`,
+`--unsigned`, `--delta` and `--offset`; `lvfxp --help` lists runnable examples. Data errors
+print to stderr with exit code 1; usage errors exit 2. Put `--` before a negative value
+in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0`.
 
 ## Why
 
@@ -100,14 +162,31 @@ Fixed-point is a core LabVIEW datatype, handled natively by LabVIEW's own flatte
 type-descriptor machinery (there is no separate OpenG FXP package); that machinery runs
 inside LabVIEW only. LabVIEW exchanges fixed-point data through TDMS files, flattened
 strings and network streams, but the Python tools that read those sources do not decode
-the FXP type:
-[autolv](https://pypi.org/project/autolv/) states fixed-point is not supported, and
-[npTDMS](https://pypi.org/project/npTDMS/) lists it among its unsupported types. General
-fixed-point maths packages such as `fxpmath` and `fixedpoint` implement their own
-arithmetic, not LabVIEW's wire layout, so they cannot read a word that LabVIEW wrote.
-`struct` and `numpy` have no type that expresses an arbitrary word length with a shifting
-or negative integer word length. `lvfxp` fills that gap with a small, zero-dependency,
-exact codec for the documented encoding.
+the FXP type: [autolv](https://pypi.org/project/autolv/) states fixed-point is not
+supported, and [npTDMS](https://pypi.org/project/npTDMS/) lists it among its unsupported
+types. General fixed-point maths packages such as `fxpmath` and `fixedpoint` implement
+their own arithmetic, not LabVIEW's wire layout. `struct` and `numpy` have no type for an
+arbitrary word length with a shifting or negative integer word length. `lvfxp` fills that
+gap with a small, zero-dependency, exact codec.
+
+## Sources
+
+- NI, [How LabVIEW Stores Data in Memory](https://www.ni.com/docs/en-US/bundle/labview/page/how-labview-stores-data-in-memory.html):
+  fixed-point numbers have a 64-bit format, signed and unsigned, sign extended to 64 bits.
+- NI, [Flattened Data](https://www.ni.com/docs/en-US/bundle/labview/page/flattened-data.html):
+  flattened numeric data is big-endian; arrays start with 32-bit dimension sizes.
+- NI, [Numeric Data Types Table](https://www.ni.com/docs/en-US/bundle/labview/page/numeric-data-types-table.html):
+  fixed-point takes 64 bits of storage on disk, or 72 with an overflow status.
+- NI, [Fixed-Point Numbers (LabVIEW 2018 Help)](https://zone.ni.com/reference/en-XX/help/371361R-01/lvhowto/fixed_point_numbers/):
+  word length between 1 and 64 bits, signed or unsigned.
+- NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/lvfpgaconcepts/fpgafixedpoint.html):
+  Truncate, Round-Half-Up (asymmetric) and Round-Half-Even (the fixed-point default);
+  Saturate and Wrap.
+- NI, [To Fixed-Point](https://www.ni.com/docs/en-US/bundle/labview-api-ref/page/functions/to-fixed-point.html):
+  saturates by default on overflow.
+- NI Community, [Flatten FXP to string](https://forums.ni.com/t5/LabVIEW/Flatten-FXP-to-string/m-p/1514224)
+  and [Flatten to String adds extra bytes to fixed point numbers](https://forums.ni.com/t5/LabVIEW/Flatten-to-String-vi-adds-extra-bytes-to-fixed-point-numbers/td-p/2923098):
+  users report 8-byte flattened output for 24-bit and 32-bit fixed-point values.
 
 ## License
 

@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lvfxp"
-version = "0.2.0"
-description = "Encode and decode LabVIEW fixed-point (FXP) numbers in pure Python"
+version = "0.3.0"
+description = "Encode and decode LabVIEW fixed-point (FXP) numbers and their flattened bytes, exactly, in pure Python"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = []
+keywords = ["labview", "fixed-point", "fxp", "flatten", "decimal"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -24,7 +24,7 @@ dependencies = []
 lvfxp = "lvfxp._cli:main"
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest", "build", "twine"]
+dev = ["ruff", "mypy", "pytest", "build", "twine", "hatchling", "editables"]
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
