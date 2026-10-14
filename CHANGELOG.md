@@ -24,7 +24,9 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   and `help()` work on all of them. Calls are unchanged; `EncodeOptions` still describes
   them and can still be unpacked into a call.
 - `FxpSpec.delta` and `FxpSpec.offset` are typed `Decimal | None` and `Decimal`, which is
-  what they always held; the constructor still takes any number.
+  what they always held; the constructor still takes any number. `dataclasses.replace` and
+  the generated constructor of a dataclass subclass follow the field types, so a type
+  checker wants `Decimal` (and `int` for the lengths) there, although any number still works.
 - A negative array count is refused as such ("array count must not be negative").
 - Messages for wide integers read `a code of 136 bits` and `a word of 16610 bits`.
 - Byte arguments (`bytes`, `bytearray` or `memoryview`) are read as their raw bytes: a
@@ -70,10 +72,6 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
 - Specs hold only their five fields, so copies and pickles (a subclass's too) work as in
   0.3.0 and pickles cross between 0.3.0 and 1.0.0 both ways; unbound methods of `FxpSpec`
   pickle again. Validation stays in `__post_init__`, as in 0.3.0.
-- `delta` and `offset` are typed `Decimal | None` and `Decimal` as fields, so
-  `dataclasses.replace(spec, delta="0.1")` and the generated constructor of a dataclass
-  subclass type-check only with `Decimal` (and `int` for the lengths); at run time they still
-  accept any number, as before.
 - Usage errors print the usage line of the subcommand that was used.
 
 ### Added
