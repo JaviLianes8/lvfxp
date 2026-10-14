@@ -9,9 +9,10 @@ from decimal import Decimal
 
 from . import __version__
 from ._errors import FxpError
-from ._numbers import as_decimal
+from ._layout import EncodeOptions
+from ._numbers import as_decimal, short
 from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE, OVERFLOW_MODES
-from ._spec import EncodeOptions, FxpSpec
+from ._spec import FxpSpec
 
 _ROUNDING = {
     "half-even": LV_ROUND_HALF_EVEN,
@@ -69,7 +70,7 @@ def _parse_hex(text: str) -> bytes:
     try:
         return bytes.fromhex(cleaned)
     except ValueError:
-        raise FxpError(f"not valid hex: {text!r}") from None
+        raise FxpError(f"not valid hex: {short(text)}") from None
 
 
 def _build_parser() -> argparse.ArgumentParser:
