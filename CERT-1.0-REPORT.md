@@ -11,7 +11,7 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
 - [x] Independent reviewer and five QA lenses report PASS (items 16, 19): all five lenses PASS at their last rounds; independent reviews 1 to 3 done, review 3 PASS
 - [x] Gates (item 15)
-- [ ] PR and trace guard CLEAN (item 17); merge and publish left to the maintainer
+- [x] PR #3 and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
 ## Scorecard
 
@@ -33,7 +33,7 @@ Progress:
 | 14 | sdist and wheel contents | PASS | wheel: package, `py.typed`, LICENSE, metadata; sdist: source, tests with the LabVIEW captures and manifest, docs; no scripts or process notes |
 | 15 | Gates exit 0 alone | PASS | `ruff format --check .`, `ruff check .`, `mypy --strict src`, `pytest`, each run alone |
 | 16 | Independent reviewer | PASS | review 1 FAIL (8 surviving mutations, report counts), fixed in 76c2f17 and a73a5c3; review 2 FAIL (3 surviving mutations, report details), fixed in 69e2583; review 3 PASS at 69e2583 |
-| 17 | PR, trace guard | pending | the PR from `release/1.0.0` and the trace guard come last; merge and PyPI publish are left to the maintainer |
+| 17 | PR, trace guard | ready | PR #3 from `release/1.0.0`, trace guard CLEAN; merge and PyPI publish left to the maintainer |
 | 18 | Mutation round | PASS | author: 58 mutations at 664ddc5, 55 killed, 3 equivalent; blind lens e: 94, then 135 + 13, then 82 on the final source with no survivor left; reviewer: 40 at 664ddc5 (8 survivors closed by `tests/test_contract_review.py`), then 59 at fc044aa (3 survivors closed by `tests/test_contract_review_two.py`), none left at 69e2583 |
 | 19 | Five QA lenses | PASS | a (round 6), b and d (round 2), c and e (final round on the final source) all PASS after their findings were fixed and re-verified |
 
@@ -207,3 +207,22 @@ check).
 | 1 | 664ddc5 | FAIL | items 1 to 5, 7 to 15 and 19 PASS; 40 mutations of its own, 30 killed, 2 equivalent, 8 survived (text key of the cached resolution, stored `delta` type, `decode` lower bound, rounding names, sequence-protocol batches, faked integer class, float subclass repr, `bytearray` subclass); a hang-prone bound test; survivor count and progress list in this report. Fixed in 76c2f17 and a73a5c3 |
 | 2 | fc044aa | FAIL | the four gates each exit 0 alone (648 tests); its 40 earlier mutations re-applied: 38 killed, 2 equivalent, the 8 former survivors killed by `tests/test_contract_review.py`; 19 new: 16 killed, 3 survived (a `__getitem__` set on the instance, a 40-character type name cut one early, the huge-integer guard widened tenfold); item 17 described as ready, the gates progress line unticked. Contracts in `tests/test_contract_review_two.py`, report fixed |
 | 3 | 69e2583 | PASS | the four gates each exit 0 alone, the wheel end-to-end module included; N03, N05 and N06 killed by `tests/test_contract_review_two.py`; over its 59 mutations 57 killed, 2 equivalent, no survivor; items 1 to 16, 18 and 19 PASS, item 17 pending |
+
+## Decisions for the maintainer
+
+- No 1.0.0 change alters a valid 0.3.0 result; the differences (error message texts, exit 2
+  for three usage errors, batches refusing text, options checked on empty batches, NumPy
+  integers accepted, `memoryview` read as raw bytes) are in CHANGELOG 1.0.0 and the guide's
+  upgrade section.
+- LabVIEW's ActiveX server cannot set or read fixed-point controls, so rounding, overflow
+  and the 72-bit overflow-status form were not captured; the docs say the tie and truncate
+  directions are derived, and 9-byte input is still refused.
+- `FxpSpec` keeps its value math on a private base class; run-time messages name `FxpSpec`,
+  while `help()` and type checkers show the base class (documented).
+- The LabVIEW captures (about 15 KB) ship in the sdist as test fixtures with their manifest;
+  they are the author's own program output from a shipped example VI.
+- GUIDE.md and this report are longer than 200 lines; the limit applies to source files, as in
+  the earlier certified libraries.
+- Branch history holds intermediate states rewritten later; a squash merge keeps `main` to
+  the final state. The README links to GUIDE.md and CHANGELOG.md on `main`, so publish after
+  the merge.
