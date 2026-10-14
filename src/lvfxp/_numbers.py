@@ -114,23 +114,20 @@ def as_int(value: object, name: str) -> int:
 
     Any integer type (``int`` subclasses, NumPy integers) is accepted through ``__index__``.
     """
-    if type(value) is bool:  # operator.index refuses floats, Decimal, Fraction, text
+    kind = type(value)  # floats, Decimal, Fraction and text have no __index__
+    if kind is bool or not hasattr(kind, "__index__"):
         raise FxpError(f"{name} must be an int, not {type_name(value)}")
-    try:
-        number = operator.index(value)  # type: ignore[arg-type]
-    except TypeError:
-        raise FxpError(f"{name} must be an int, not {type_name(value)}") from None
-    return int.__index__(number)
+    return int.__index__(operator.index(value))  # type: ignore[arg-type]
 
 
 def as_items(values: Iterable[T], name: str) -> Iterator[T]:
     """Iterate ``values``; text, bytes-like objects and non-iterables raise FxpError."""
     if issubclass(type(values), (str, bytes, bytearray, memoryview)):
         raise FxpError(f"{name} must be an iterable of items, not {type_name(values)}")
-    try:
-        return iter(values)
-    except TypeError:
-        raise FxpError(f"{name} must be an iterable, not {type_name(values)}") from None
+    kind = type(values)
+    if not (hasattr(kind, "__iter__") or hasattr(kind, "__getitem__")):
+        raise FxpError(f"{name} must be an iterable, not {type_name(values)}")
+    return iter(values)  # an error raised by the caller's own __iter__ propagates
 
 
 def power_of_two(exponent: int) -> Decimal:

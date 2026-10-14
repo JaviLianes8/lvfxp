@@ -61,24 +61,28 @@ OVERFLOW_MODES = ("raise", "saturate", "wrap")
 _HALF = Fraction(1, 2)
 
 
-def check_rounding(rounding: str) -> None:
-    if not issubclass(type(rounding), str) or rounding not in ROUNDING_MODES:
+def check_rounding(rounding: str) -> str:
+    """Return the rounding name as a plain str; a str subclass cannot change what it says."""
+    plain = str.__str__(rounding) if issubclass(type(rounding), str) else None
+    if plain not in ROUNDING_MODES:
         raise FxpError(f"unknown rounding mode {short(rounding)}")
+    return plain
 
 
 def overflow_mode(clamp: bool, overflow: str) -> str:
     """Resolve the ``clamp`` shorthand and the ``overflow`` name into one mode."""
     if type(clamp) is not bool:
         raise FxpError("clamp must be a bool")
-    if not issubclass(type(overflow), str) or overflow not in OVERFLOW_MODES:
+    plain = str.__str__(overflow) if issubclass(type(overflow), str) else None
+    if plain not in OVERFLOW_MODES:
         raise FxpError(
             f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {short(overflow)}"
         )
     if clamp:
-        if overflow == "wrap":
+        if plain == "wrap":
             raise FxpError("clamp=True saturates; it cannot be combined with overflow='wrap'")
         return "saturate"
-    return overflow
+    return plain
 
 
 def check_options(clamp: bool, overflow: str, rounding: str) -> str:
@@ -90,7 +94,7 @@ def check_options(clamp: bool, overflow: str, rounding: str) -> str:
 
 def round_exact(quotient: Fraction, rounding: str) -> int:
     """Round an exact rational to an integer with a ``decimal`` or LabVIEW mode."""
-    check_rounding(rounding)
+    rounding = check_rounding(rounding)
     floor = quotient.numerator // quotient.denominator
     rest = quotient - floor
     if rest == 0:

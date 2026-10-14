@@ -26,9 +26,11 @@ def as_bytes(data: object) -> bytes:
     if not issubclass(type(data), (bytes, bytearray, memoryview)):  # never trust __class__
         raise FxpError(f"expected bytes, not {type_name(data)}")
     try:
-        return memoryview(
-            cast(bytes, data)
-        ).tobytes()  # the real buffer, whatever a subclass claims
+        if issubclass(type(data), bytes):  # the stored bytes, whatever a subclass's buffer says
+            return bytes.__getitem__(cast(bytes, data), slice(None))
+        if issubclass(type(data), bytearray):
+            return bytes(bytearray.copy(cast(bytearray, data)))
+        return memoryview(cast(memoryview, data)).tobytes()
     except ValueError:
         raise FxpError("expected bytes, got a released memoryview") from None
 

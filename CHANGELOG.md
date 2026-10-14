@@ -45,6 +45,8 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   exit code when stderr is closed, and cuts data and usage error messages at 300 characters.
 - Type checks look at an argument's real type, so an object faking `__class__` (a mock with
   `spec=`) is refused with `FxpError` instead of failing inside the conversion.
+  Option names are read as their real text and a `bytes` or `bytearray` subclass as the
+  bytes it holds; an error raised by the caller's own `__index__` or `__iter__` propagates.
 - An exponent too large even for `decimal` (`"1e" + "9" * 19`) is reported as beyond the
   exponent bound, not as "not a number".
 - `encode_many` and `pack_array` check their options even for an empty batch.
