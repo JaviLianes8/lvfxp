@@ -25,7 +25,7 @@ Progress:
 | 6 | Contract asserts the full promise | PASS | 648 tests: a promise test per public name, a rational oracle, both LabVIEW capture sets, CLI in process and by subprocess, and the contracts from three blind mutation rounds and the review |
 | 7 | Real ground truth | PASS | five datalog files written by LabVIEW 2026 on this PC, 260 records, the 256-value sweep captured 2026-10-14 (manifest with SHA-256); NI pages re-fetched by two reviewers; independent Fraction oracles agree |
 | 8 | Real e2e incl. PyPI upgrade | PASS | wheel in clean venvs, suite from the sdist with `src` removed against the built wheel, sabotaged CLI caught, PyPI 0.3.0 upgraded in place with every difference documented |
-| 9 | Seeded fuzz, no crash, hang or blow-up | PASS | seeded oracle and fuzz tests in the suite; lens c rounds totalling about 5.5 million calls, every input dimension linear or capped |
+| 9 | Seeded fuzz, no crash, hang or blow-up | PASS | seeded oracle and fuzz tests in the suite; lens c rounds totalling about 5.3 million calls, every input dimension linear or capped |
 | 10 | Every interpreter | PASS | 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.6, 3.14.8 and 3.14.8t from the installed wheel (lens d and the reviewer, on the build machines); this PC's own 3.13.2 runs the gates |
 | 11 | README | PASS | `twine check --strict` PASSED; absolute links tested; problem, verified why (autolv and npTDMS sources checked), install, quick start, GUIDE and CHANGELOG links |
 | 12 | CHANGELOG dated 1.0.0 | PASS | `## [1.0.0] - 2026-10-14` with the stable surface and every behaviour change |
