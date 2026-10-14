@@ -109,3 +109,15 @@ def test_type_hints_resolve_at_run_time(name: str) -> None:
                 function = member.fget if isinstance(member, property) else member
                 if inspect.isfunction(function):
                     typing.get_type_hints(function)
+
+
+def test_the_doctests_of_the_inherited_methods_run() -> None:
+    from lvfxp._layout import Layout
+
+    finder, runner = doctest.DocTestFinder(), doctest.DocTestRunner()
+    tests = [t for t in finder.find(Layout, "Layout", module=False) if t.examples]
+    for test in tests:
+        runner.run(test)
+    names = {test.name.rsplit(".", 1)[-1] for test in tests}
+    assert {"encode", "decode", "encode_many", "decode_many", "resolution"} <= names
+    assert runner.summarize(verbose=False).failed == 0

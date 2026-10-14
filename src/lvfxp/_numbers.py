@@ -115,7 +115,7 @@ def as_int(value: object, name: str) -> int:
     Any integer type (``int`` subclasses, NumPy integers) is accepted through ``__index__``.
     """
     kind = type(value)  # floats, Decimal, Fraction and text have no __index__
-    if kind is bool or not hasattr(kind, "__index__"):
+    if kind is bool or getattr(kind, "__index__", None) is None:
         raise FxpError(f"{name} must be an int, not {type_name(value)}")
     return int.__index__(operator.index(value))  # type: ignore[arg-type]
 
@@ -125,7 +125,8 @@ def as_items(values: Iterable[T], name: str) -> Iterator[T]:
     if issubclass(type(values), (str, bytes, bytearray, memoryview)):
         raise FxpError(f"{name} must be an iterable of items, not {type_name(values)}")
     kind = type(values)
-    if not (hasattr(kind, "__iter__") or hasattr(kind, "__getitem__")):
+    iterate = getattr(kind, "__iter__", False)  # None means "not iterable", as in Python
+    if iterate is None or (iterate is False and getattr(kind, "__getitem__", None) is None):
         raise FxpError(f"{name} must be an iterable, not {type_name(values)}")
     return iter(values)  # an error raised by the caller's own __iter__ propagates
 
