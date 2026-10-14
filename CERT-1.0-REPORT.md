@@ -9,7 +9,7 @@ Progress:
 - [x] Contract, fuzz and author mutation round (items 6, 9, 18)
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [ ] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
-- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): first round done (b PASS; a, c, d FAIL, fixed); re-verification of a, b, c, d running at a8e90b4; e running
+- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): first round done (b PASS; a, c, d, e FAIL, fixed); re-verification under way
 - [ ] Gates (item 15)
 - [ ] PR and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
@@ -102,6 +102,7 @@ worked in its own clone, ran things rather than reading, and reported back priva
 | b. Correctness and ground truth | 9645ac4 | PASS (2 low, 2 info) | about 1.85 million oracle cases, 400 CLI runs, 1,300 fixed-point fields of the LabVIEW captures and their 5 type descriptors, NI pages fetched: no disagreement. Stale source URLs, tie and truncate directions presented as NI-stated, negative array count message, signed count not from NI. Fixed in 566701a |
 | c. Adversarial and robustness | 0782166 | FAIL (3 medium, 4 low, info) | 1,727,755 fuzz calls, 30,000 in-process and 400 subprocess CLI runs, 24 scaling shapes (linear or capped). Results depended on `sys.set_int_max_str_digits`; batches accepted text and leaked `TypeError`; closed pipes gave exit 120; some usage errors exited 1; argparse echoed huge arguments. Fixed in 60805d6 |
 | d. Packaging and real e2e | 514d8ed | FAIL (1 medium, 3 low, info) | 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.8, 3.14.8t, 3.14.6 all green from the wheel; 0.3.0 upgrade matches the CHANGELOG. The e2e module always rebuilt from source and errored with `src` removed; undocumented base class and message suffix; `release.ps1` refused any upload once the name existed. Fixed in a8e90b4 |
+| e. Contract strength | 0782166 | FAIL until its contracts were added | blind round designed from the source: 94 mutations, 75 killed, 5 proven equivalent (with a 5.08 million output differential check), 14 survivors; the 14 contracts it proposed were added in 3f53b93 (`tests/test_contract_strength.py`; the array-count one is covered by `tests/test_contract_edges.py` since a negative count got its own message). It also noted argparse echoing huge numbers, fixed in 60805d6 |
 
 ## Author mutation round (item 18)
 
