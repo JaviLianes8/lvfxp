@@ -4,12 +4,12 @@ Progress:
 - [x] Branch `release/1.0.0` created from `main` (0.3.0, e654fd6)
 - [x] Real LabVIEW 2026 capture: every I8 value through `Fixed-Point Cast.vi` (item 7)
 - [ ] Baseline gates run on 0.3.0
-- [ ] API review and 1.0.0 API changes (item 1)
-- [ ] Errors, typing, docstrings and doctests (items 2 to 5)
-- [ ] Contract, fuzz and author mutation round (items 6, 9, 18)
-- [ ] Docs: README, GUIDE, CHANGELOG (items 11, 12)
+- [x] API review and 1.0.0 API changes (item 1)
+- [x] Errors, typing, docstrings and doctests (items 2 to 5)
+- [ ] Contract, fuzz and author mutation round (items 6, 9, 18): contracts and seeded oracle written; mutation round running
+- [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [ ] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
-- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19)
+- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): lenses a to e started at 9645ac4
 - [ ] Gates (item 15)
 - [ ] PR and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
@@ -53,3 +53,20 @@ Not capturable through the ActiveX server: setting or reading a fixed-point cont
 (`SetControlValue` leaves it at zero and `GetControlValue` reports a type mismatch), so
 LabVIEW's rounding and overflow modes and the 72-bit overflow-status form could not be
 captured with chosen values.
+
+## API review (item 1)
+
+The sixteen public names of 0.3.0 are kept with the same signatures and defaults. Changes for
+1.0.0, all listed in CHANGELOG 1.0.0 and the guide's upgrade section:
+
+- Integer arguments accept any `__index__` integer (NumPy integers) and are stored as `int`.
+- Byte arguments are typed `bytes | bytearray | memoryview`, which 0.3.0 already accepted at
+  run time (`mypy --strict` flagged its own test of that), and a `memoryview` is read as its
+  raw bytes whatever its item format.
+- Error messages are bounded (40 characters of a value, wide integers described by size); in
+  0.3.0 a huge value produced a huge message, and an out-of-range code wider than about 14000
+  bits made the message itself raise a plain `ValueError`.
+- Results no longer depend on the caller's `decimal` context.
+- `python -m lvfxp`; the command exits 1 quietly when its reader closes the pipe.
+- The value math and the byte forms moved into `_layout.py` and `_spec.py` so every source
+  file stays under 200 lines; `FxpSpec` is the same frozen dataclass.
