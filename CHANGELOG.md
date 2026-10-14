@@ -40,8 +40,13 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   `InvalidOperation` flag.
 - An integer value wider than about 34000 bits is refused at once with `FxpError` instead of
   being converted first.
-- The `lvfxp` command exits 1 quietly when its reader closes the pipe (and keeps its exit
-  code when stderr is closed), and cuts data and usage error messages at 300 characters.
+- The `lvfxp` command exits 1 quietly when its reader closes the pipe (`--help` and
+  `--version` included, and also when a descriptor is closed inside the process), keeps its
+  exit code when stderr is closed, and cuts data and usage error messages at 300 characters.
+- Type checks look at an argument's real type, so an object faking `__class__` (a mock with
+  `spec=`) is refused with `FxpError` instead of failing inside the conversion.
+- An exponent too large even for `decimal` (`"1e" + "9" * 19`) is reported as beyond the
+  exponent bound, not as "not a number".
 - `lvfxp decode` without hex or `--word`, or with both, and `lvfxp encode --clamp --overflow
   wrap` are usage errors now: exit 2 with the usage line, instead of exit 1.
 - `encode_many`, `decode_many` and `pack_array` refuse text, bytes-like objects and

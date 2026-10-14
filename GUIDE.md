@@ -175,7 +175,8 @@ compact bytes: 1
 Data errors print `lvfxp: <message>` to stderr and exit 1; usage errors (including `decode`
 without hex or `--word`, or with both, and `--clamp` with `--overflow wrap`) exit 2. When the
 reader of the output goes away (as with `| head -c 0`), the command exits 1 without a
-traceback.
+traceback, `--help` and `--version` included. An integer option longer than Python's
+integer-string limit (4300 digits) is refused by the option parser, so it is a usage error.
 
 ## What is verified
 

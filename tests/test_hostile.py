@@ -157,3 +157,36 @@ def test_batch_calls_want_an_iterable_of_items(items: object) -> None:
     for call in (spec.encode_many, spec.decode_many, spec.pack_array):
         with pytest.raises(FxpError, match="iterable"):
             call(items)  # type: ignore[arg-type]
+
+
+class _FakeClass:
+    def __init__(self, claimed: type) -> None:
+        self._claimed = claimed
+
+    @property  # type: ignore[misc]
+    def __class__(self) -> type:  # a mock with spec= lies the same way
+        return self._claimed
+
+
+@pytest.mark.parametrize("claimed", [Decimal, str, int, float, bytes, bool])
+def test_a_faked_class_is_refused_with_fxp_error(claimed: type) -> None:
+    fake = _FakeClass(claimed)
+    spec = FxpSpec(8, 5)
+    for call in (
+        lambda: spec.encode(fake),  # type: ignore[arg-type]
+        lambda: FxpSpec(8, 5, delta=fake),  # type: ignore[arg-type]
+        lambda: spec.unpack(fake),  # type: ignore[arg-type]
+        lambda: spec.encode(1, rounding=fake),  # type: ignore[arg-type]
+        lambda: spec.encode(1, clamp=fake),  # type: ignore[arg-type]
+        lambda: FxpSpec(8, 5, signed=fake),  # type: ignore[arg-type]
+    ):
+        with pytest.raises(FxpError):
+            call()
+
+
+@pytest.mark.parametrize("digits", [18, 19, 40])
+def test_an_exponent_beyond_decimal_itself_is_named_as_such(digits: int) -> None:
+    with pytest.raises(FxpError, match="exponent beyond"):
+        to_fxp("1e" + "9" * digits, 8, 5)
+    with pytest.raises(FxpError, match="exponent beyond"):
+        to_fxp("-1.5E-" + "9" * digits, 8, 5)

@@ -58,7 +58,7 @@ class Layout:
         if abs(iwl) > MAX_INTEGER_WORD_LENGTH:
             bound = MAX_INTEGER_WORD_LENGTH
             raise FxpError(f"integer_word_length must be between -{bound} and {bound}")
-        if not isinstance(signed, bool):
+        if type(signed) is not bool:
             raise FxpError("signed must be a bool")
         resolved = None if delta is None else as_decimal(delta, "delta")
         if resolved is not None and resolved <= 0:

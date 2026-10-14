@@ -9,6 +9,7 @@ LabVIEW stores 72 bits; where that status byte sits is not documented, so it is 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from ._errors import FxpError
 from ._numbers import Bytes, type_name
@@ -22,10 +23,12 @@ _MAX_COUNT = (1 << 31) - 1
 
 def as_bytes(data: object) -> bytes:
     """Return the raw bytes of a bytes-like ``data`` (any memoryview format, flattened)."""
-    if not isinstance(data, (bytes, bytearray, memoryview)):
+    if not issubclass(type(data), (bytes, bytearray, memoryview)):  # never trust __class__
         raise FxpError(f"expected bytes, not {type_name(data)}")
     try:
-        return memoryview(data).tobytes()  # the real buffer, whatever a subclass claims
+        return memoryview(
+            cast(bytes, data)
+        ).tobytes()  # the real buffer, whatever a subclass claims
     except ValueError:
         raise FxpError("expected bytes, got a released memoryview") from None
 

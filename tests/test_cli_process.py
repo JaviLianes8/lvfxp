@@ -55,9 +55,24 @@ def _closed(stream: str, *args: str) -> tuple[int, bytes]:
 def test_help_and_version_to_a_closed_pipe_exit_cleanly() -> None:
     for args in (["--help"], ["--version"]):
         code, err = _closed("stdout", *args)
-        assert (code, b"Traceback" in err, b"Exception ignored" in err) == (0, False, False)
+        assert (code, b"Traceback" in err, b"Exception ignored" in err) == (1, False, False)
 
 
 def test_errors_to_a_closed_stderr_keep_their_exit_codes() -> None:
     assert _closed("stderr", "encode", "nan", "--wl", "8", "--iwl", "5")[0] == 1
     assert _closed("stderr", "bogus")[0] == 2
+
+
+def test_a_descriptor_closed_inside_the_process_does_not_give_exit_120() -> None:
+    code = (
+        "import os, sys, runpy; os.close({fd}); "
+        "sys.argv = ['lvfxp'] + {args!r}; runpy.run_module('lvfxp', run_name='__main__')"
+    )
+    cases = [
+        (1, ["encode", "1", "--wl", "8", "--iwl", "5"], 1),
+        (2, ["encode", "nan", "--wl", "8", "--iwl", "5"], 1),
+    ]
+    for fd, args, expected in cases:
+        command = [sys.executable, "-c", code.format(fd=fd, args=args)]
+        result = subprocess.run(command, capture_output=True, env=_ENV, timeout=60)
+        assert result.returncode == expected, (fd, result.returncode)

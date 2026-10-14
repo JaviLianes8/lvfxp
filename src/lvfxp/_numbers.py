@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import operator
+import re
 from collections.abc import Iterable, Iterator
 from decimal import Context, Decimal, InvalidOperation
 from fractions import Fraction
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from ._errors import FxpError
 
@@ -22,6 +23,7 @@ _MAX_BITS = 34_000
 # Error messages never echo more than this many characters of a caller's value.
 _SHOW_LIMIT = 40
 _TYPE_NAME = type.__dict__["__name__"]
+_HUGE_EXPONENT = re.compile(r"\s*[+-]?(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)[eE][+-]?\d[\d_]*\s*")
 
 
 def type_name(value: object) -> str:
@@ -32,8 +34,8 @@ def type_name(value: object) -> str:
 
 def short(value: object) -> str:
     """Return a bounded description of ``value`` for an error message."""
-    if isinstance(value, int) and not isinstance(value, bool):
-        number = int.__index__(value)
+    if issubclass(type(value), int) and type(value) is not bool:
+        number = int.__index__(cast(int, value))
         if number.bit_length() > 64:
             return f"an integer of {number.bit_length()} bits"
         return str(number)
@@ -53,8 +55,8 @@ def describe(number: int, noun: str) -> str:
 
 
 def _parse(value: str | int, name: str) -> Decimal:
-    if isinstance(value, int):
-        number = int.__index__(value)
+    if issubclass(type(value), int):
+        number = int.__index__(cast(int, value))
         if number.bit_length() > _MAX_BITS:
             raise FxpError(f"{name} needs a decimal exponent beyond +/-{MAX_EXPONENT}")
         return Decimal(number)
@@ -62,6 +64,8 @@ def _parse(value: str | int, name: str) -> Decimal:
     try:
         return Decimal(str.__str__(value), Context(traps=[InvalidOperation]))
     except InvalidOperation:
+        if _HUGE_EXPONENT.fullmatch(str.__str__(value)):  # beyond what Decimal itself can hold
+            raise FxpError(f"{name} needs a decimal exponent beyond +/-{MAX_EXPONENT}") from None
         raise FxpError(f"{name} is not a number: {short(value)}") from None
 
 
@@ -75,14 +79,15 @@ def as_decimal(value: object, name: str = "value") -> Decimal:
     >>> as_decimal(0.1), as_decimal("1e3"), as_decimal(7)
     (Decimal('0.1'), Decimal('1E+3'), Decimal('7'))
     """
-    if isinstance(value, bool):
+    kind = type(value)  # the real type: a faked __class__ must not pass a check
+    if kind is bool:
         raise FxpError(f"{name} must be a number, not a bool")
-    if isinstance(value, Decimal):
-        result = Decimal(value)
-    elif isinstance(value, float):
+    if issubclass(kind, Decimal):
+        result = Decimal(cast(Decimal, value))
+    elif issubclass(kind, float):
         result = Decimal(float.__repr__(value))
-    elif isinstance(value, (int, str)):
-        result = _parse(value, name)
+    elif issubclass(kind, (int, str)):
+        result = _parse(cast("int | str", value), name)
     else:
         raise FxpError(f"{name} must be int, float, Decimal or str, not {type_name(value)}")
     if not result.is_finite():
@@ -105,7 +110,7 @@ def as_int(value: object, name: str) -> int:
 
     Any integer type (``int`` subclasses, NumPy integers) is accepted through ``__index__``.
     """
-    if isinstance(value, bool):  # operator.index refuses floats, Decimal, Fraction, text
+    if type(value) is bool:  # operator.index refuses floats, Decimal, Fraction, text
         raise FxpError(f"{name} must be an int, not {type_name(value)}")
     try:
         number = operator.index(value)  # type: ignore[arg-type]
@@ -116,7 +121,7 @@ def as_int(value: object, name: str) -> int:
 
 def as_items(values: Iterable[T], name: str) -> Iterator[T]:
     """Iterate ``values``; text, bytes-like objects and non-iterables raise FxpError."""
-    if isinstance(values, (str, bytes, bytearray, memoryview)):
+    if issubclass(type(values), (str, bytes, bytearray, memoryview)):
         raise FxpError(f"{name} must be an iterable of items, not {type_name(values)}")
     try:
         return iter(values)

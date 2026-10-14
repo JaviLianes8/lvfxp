@@ -26,8 +26,9 @@ def silence() -> None:
         except (AttributeError, OSError, ValueError):
             continue
         null = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(null, fd)
-        os.close(null)
+        if null != fd:  # a closed fd is reused by open(): then it already is the null device
+            os.dup2(null, fd)
+            os.close(null)
 
 
 def finish(code: int) -> int:
@@ -60,11 +61,13 @@ class Parser(argparse.ArgumentParser):
             message = message[:MESSAGE_LIMIT] + "..."
         self.exit(2, f"{self.format_usage()}{self.prog}: error: {message}\n")
 
+    lost_output = False  # set when help or version text could not reach its reader
+
     def exit(self, status: int = 0, message: str | None = None) -> NoReturn:
         if message:
             write("stderr", message)
-        raise SystemExit(finish(status))
+        raise SystemExit(finish(1 if status == 0 and self.lost_output else status))
 
     def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None:
-        if message:
-            write("stderr" if file is sys.stderr else "stdout", message)
+        if message and not write("stderr" if file is sys.stderr else "stdout", message):
+            Parser.lost_output = True
