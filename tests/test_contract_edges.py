@@ -77,3 +77,10 @@ def test_the_public_class_name_is_what_callers_see() -> None:
         FxpSpec(8, 5).encode(1, bogus=1)  # type: ignore[call-arg]
     getter = inspect.getattr_static(FxpSpec, "resolution").fget
     assert getter.__qualname__ == "FxpSpec.resolution"
+
+
+def test_a_wide_word_length_is_described_by_its_size() -> None:
+    with pytest.raises(FxpError, match=r"got an integer of 101 bits$"):
+        FxpSpec(2**100, 5)
+    with pytest.raises(FxpError, match=r"got 65$"):
+        FxpSpec(65, 5)
