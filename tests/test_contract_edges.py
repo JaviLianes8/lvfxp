@@ -99,12 +99,22 @@ def test_zero_is_zero_whatever_its_exponent() -> None:
     assert to_fxp("-0.00e-" + "9" * 25, 8, 5) == 0
 
 
-def test_a_fine_layout_is_prepared_once_for_a_batch() -> None:
+def test_a_fine_layout_is_prepared_once_for_a_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    from lvfxp._numbers import power_of_two
+
     spec = FxpSpec(64, -4096)
-    start = time.perf_counter()
-    values = spec.decode_many(range(2000))
-    assert spec.encode_many(values) == list(range(2000))
-    assert time.perf_counter() - start < 2
+    calls: list[int] = []
+    real = power_of_two
+
+    def counted(exponent: int) -> Decimal:
+        calls.append(exponent)
+        return real(exponent)
+
+    monkeypatch.setattr("lvfxp._layout.power_of_two", counted)
+    values = spec.decode_many(range(200))
+    assert spec.encode_many(values) == list(range(200))
+    assert (spec.resolution, spec.min_value) == (values[1], spec.decode(1 << 63))
+    assert calls == []
 
 
 def test_every_integer_argument_is_typed_supports_index() -> None:
