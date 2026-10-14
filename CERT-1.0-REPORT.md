@@ -6,7 +6,7 @@ Progress:
 - [x] Baseline gates run on 0.3.0
 - [x] API review and 1.0.0 API changes (item 1)
 - [x] Errors, typing, docstrings and doctests (items 2 to 5)
-- [ ] Contract, fuzz and author mutation round (items 6, 9, 18): contracts and seeded oracle written; mutation round running
+- [x] Contract, fuzz and author mutation round (items 6, 9, 18)
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [ ] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
 - [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): first round done (b PASS; a, c, d FAIL, fixed); re-verification of a, b, c, d running at a8e90b4; e running
@@ -102,3 +102,79 @@ worked in its own clone, ran things rather than reading, and reported back priva
 | b. Correctness and ground truth | 9645ac4 | PASS (2 low, 2 info) | about 1.85 million oracle cases, 400 CLI runs, 1,300 fixed-point fields of the LabVIEW captures and their 5 type descriptors, NI pages fetched: no disagreement. Stale source URLs, tie and truncate directions presented as NI-stated, negative array count message, signed count not from NI. Fixed in 566701a |
 | c. Adversarial and robustness | 0782166 | FAIL (3 medium, 4 low, info) | 1,727,755 fuzz calls, 30,000 in-process and 400 subprocess CLI runs, 24 scaling shapes (linear or capped). Results depended on `sys.set_int_max_str_digits`; batches accepted text and leaked `TypeError`; closed pipes gave exit 120; some usage errors exited 1; argparse echoed huge arguments. Fixed in 60805d6 |
 | d. Packaging and real e2e | 514d8ed | FAIL (1 medium, 3 low, info) | 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.8, 3.14.8t, 3.14.6 all green from the wheel; 0.3.0 upgrade matches the CHANGELOG. The e2e module always rebuilt from source and errored with `src` removed; undocumented base class and message suffix; `release.ps1` refused any upload once the name existed. Fixed in a8e90b4 |
+
+## Author mutation round (item 18)
+
+Each mutation was applied alone to a clean clone of the branch, `__pycache__` purged, no
+bytecode written, the suite run with `-x` and a per-mutant timeout, and the clone restored; the
+full suite (wheel end to end included) was green before and after. The first run (1e25323, 52
+mutations) left 11 survivors; contracts were added in 514d8ed and later commits. The table is
+the final run at a8e90b4 (57 mutations, the mutated text updated where the source had moved),
+with M39 and M42 re-applied at 8ecb78f: 54 killed (8 of them only after a new contract),
+3 equivalent.
+
+| Id | Mutation | File | Result | Caught by |
+| --- | --- | --- | --- | --- |
+| M01 | flatten little-endian | `_flat.py` | killed | `tests/test_bytes.py::test_pack_writes_labviews_flattened_form[000000000000007f-8-5-True-value0]` |
+| M02 | unflatten little-endian | `_flat.py` | killed | `tests/test_bytes.py::test_unpack_reads_labviews_flattened_form[000000000000007f-8-5-True-value0]` |
+| M03 | no sign extension | `_flat.py` | killed | `tests/test_bytes.py::test_pack_writes_labviews_flattened_form[ffffffffffffff80-8-5-True-value1]` |
+| M04 | unsigned read as signed | `_flat.py` | killed | `tests/test_bytes.py::test_unpack_reads_labviews_flattened_form[ffffffffffffffff-64-64-False-value11]` |
+| M05 | extension check dropped | `_flat.py` | killed | `tests/test_bytes.py::test_unpack_rejects_high_bits_that_are_not_the_extension` |
+| M06 | compact size off by one | `_flat.py` | killed | `tests/test_bytes.py::test_compact_form_is_ceil_word_length_over_eight_bytes` |
+| M07 | compact high bits kept | `_flat.py` | killed | `tests/test_bytes.py::test_compact_unpack_ignores_bits_above_the_word` |
+| M08 | 9-byte hint wrong size | `_flat.py` | killed | `tests/test_bytes.py::test_unpack_rejects_the_wrong_size_and_explains_nine_bytes` |
+| M09 | array count little-endian | `_flat.py` | killed | `tests/test_bytes.py::test_array_is_a_count_then_eight_byte_elements` |
+| M10 | array trailing bytes accepted | `_flat.py` | survived, then killed | `tests/test_contract_edges.py::test_an_array_with_trailing_bytes_is_refused` |
+| M11 | array count unsigned | `_flat.py` | survived, then killed | `tests/test_contract_edges.py::test_the_array_count_is_read_as_a_signed_32_bit_integer` |
+| M12 | buffer copied by bytes() | `_flat.py` | killed | `tests/test_hostile.py::test_a_bytes_subclass_cannot_lie_about_itself` |
+| M13 | LV half-up away from zero | `_quantize.py` | killed | `tests/test_cli.py::test_every_help_example_prints_what_it_claims[args5-0000000000000000]` |
+| M14 | half-even to odd | `_quantize.py` | killed | `tests/test_codec.py::test_half_even_rounding_is_the_default` |
+| M15 | tie decided before mode | `_quantize.py` | equivalent | equivalent: the changed comparison sits inside `rest != 1/2`, where `<` and `<=` agree |
+| M16 | truncate toward zero | `_quantize.py` | killed | `tests/test_codec.py::test_labview_truncate_rounds_toward_negative_infinity` |
+| M17 | ROUND_DOWN floors | `_quantize.py` | killed | `tests/test_oracle.py::test_encode_rounds_and_overflows_like_the_oracle[0]` |
+| M18 | saturate swapped | `_quantize.py` | killed | `tests/test_codec.py::test_overflow_saturates_when_requested` |
+| M19 | wrap loses sign | `_quantize.py` | equivalent | equivalent: `encode` adds 2**wl to a negative code, so the wrapped word is the same either way |
+| M20 | clamp+wrap accepted | `_quantize.py` | killed | `tests/test_codec.py::test_wrap_and_clamp_cannot_be_combined` |
+| M21 | clamp type unchecked | `_quantize.py` | killed | `tests/test_limits.py::test_option_types_are_checked` |
+| M22 | overflow wrong error type | `_quantize.py` | killed | `tests/test_codec.py::test_overflow_raises_by_default` |
+| M23 | exact values rounded | `_quantize.py` | killed | `tests/test_oracle.py::test_encode_rounds_and_overflows_like_the_oracle[0]` |
+| M24 | wl 65 accepted | `_layout.py` | killed | `tests/test_cli.py::test_data_errors_go_to_stderr_with_exit_one[args2-between 1 and 64]` |
+| M25 | iwl bound off by one | `_layout.py` | killed | `tests/test_hostile.py::test_the_int_string_limit_of_the_caller_changes_nothing` |
+| M26 | resolution exponent swapped | `_layout.py` | killed | `tests/test_bytes.py::test_unpack_reads_labviews_flattened_form[000000000000007f-8-5-True-value0]` |
+| M27 | zero delta accepted | `_layout.py` | killed | `tests/test_spec.py::test_delta_must_be_positive` |
+| M28 | unsigned max halved | `_layout.py` | killed | `tests/test_cli.py::test_info_describes_the_layout` |
+| M29 | encode returns signed code | `_layout.py` | killed | `tests/test_bytes.py::test_pack_writes_labviews_flattened_form[ffffffffffffff80-8-5-True-value1]` |
+| M30 | unsigned accepts negative word | `_layout.py` | equivalent | equivalent: an unsigned layout has a minimum code of 0, so a negative word still fails the next check |
+| M31 | word 2**wl accepted | `_layout.py` | killed | `tests/test_codec.py::test_decode_rejects_a_word_that_is_too_wide` |
+| M32 | caller context used | `_layout.py` | killed | `tests/test_cli.py::test_decode_prints_plain_exact_digits` |
+| M33 | offset sign in encode | `_layout.py` | killed | `tests/test_oracle.py::test_general_layouts_match_the_oracle[0]` |
+| M34 | signed type unchecked | `_layout.py` | killed | `tests/test_spec.py::test_layout_fields_are_type_checked` |
+| M35 | float binary expansion | `_numbers.py` | killed | `tests/test_docs.py::test_module_doctests_pass[lvfxp._numbers]` |
+| M36 | bool accepted as value | `_numbers.py` | killed | `tests/test_spec.py::test_bad_values_raise_fxp_error_not_decimal_errors[True]` |
+| M37 | huge adjusted exponent accepted | `_numbers.py` | survived, then killed | `tests/test_contract_edges.py::test_a_long_digit_string_is_refused_for_its_size_not_saturated` |
+| M38 | message bound lifted | `_numbers.py` | killed | `tests/test_docs.py::test_guide_examples_run_and_print_what_they_show` |
+| M39 | wide ints printed | `_numbers.py` | survived, then killed | new `tests/test_contract_edges.py::test_a_wide_word_length_is_described_by_its_size` (re-applied at 8ecb78f) |
+| M40 | bool accepted as an integer field | `_numbers.py` | killed | `tests/test_hostile.py::test_non_integers_are_refused_for_integer_fields[True]` |
+| M41 | caller context traps used | `_numbers.py` | killed | `tests/test_hostile.py::test_the_callers_decimal_context_changes_nothing[context2]` |
+| M42 | huge int guard lifted | `_numbers.py` | survived, then killed | `tests/test_contract_edges.py::test_a_huge_integer_is_refused_before_any_conversion` (re-applied at 8ecb78f) |
+| M43 | data error exit 2 | `_cli.py` | killed | `tests/test_cli.py::test_data_errors_go_to_stderr_with_exit_one[args0-outside]` |
+| M44 | CLI half-up mapped wrong | `_cli.py` | survived, then killed | `tests/test_contract_edges.py::test_cli_half_up_sends_positive_ties_up` |
+| M45 | CLI default compact | `_cli.py` | killed | `tests/test_cli.py::test_every_help_example_prints_what_it_claims[args0-000000000000007f]` |
+| M46 | plain keeps trailing zeros | `_cli.py` | killed | `tests/test_cli.py::test_every_help_example_prints_what_it_claims[args7--16]` |
+| M47 | CLI signedness inverted | `_cli.py` | killed | `tests/test_cli.py::test_every_help_example_prints_what_it_claims[args1-fffffffffffffffb]` |
+| M48 | CLI message unbounded | `_cli.py` | survived, then killed | `tests/test_contract_edges.py::test_cli_cuts_any_long_error_message` |
+| M49 | unpack_fxp ignores signed | `_codec.py` | killed | `tests/test_bytes.py::test_unpack_reads_labviews_flattened_form[00000000000003e5-10-4-False-value5]` |
+| M50 | from_fxp args swapped | `_codec.py` | killed | `tests/test_codec.py::test_unsigned_binary_point_example` |
+| M51 | byte_length compact | `_spec.py` | killed | `tests/test_bytes.py::test_flattened_size_is_always_eight_bytes` |
+| M52 | unpack_array signed | `_spec.py` | survived, then killed | `tests/test_contract_edges.py::test_an_unsigned_array_keeps_words_with_the_top_bit_set` |
+| M53 | text accepted as a batch | `_numbers.py` | killed | `tests/test_hostile.py::test_batch_calls_want_an_iterable_of_items[12]` |
+| M54 | fine resolution rounded | `_layout.py` | killed | `tests/test_cli.py::test_decode_prints_plain_exact_digits` |
+| M55 | usage problem exits 1 | `_cli.py` | killed | `tests/test_cli.py::test_usage_errors_exit_two_with_a_short_message[args1-use --word]` |
+| M56 | usage message unbounded | `_cli_io.py` | killed | `tests/test_cli.py::test_usage_errors_exit_two_with_a_short_message[args4-invalid int value]` |
+| M57 | count -1 accepted | `_flat.py` | killed | `tests/test_contract_edges.py::test_the_array_count_is_read_as_a_signed_32_bit_integer` |
+
+Equivalent: M15 (the changed comparison is reached only when the remainder is not one half,
+where `<` and `<=` agree), M19 (`encode` adds `2**wl` to a negative code, so the word is the
+same), M30 (an unsigned layout's minimum code is 0, so a negative word still fails the next
+check). In the first run, a check refusing floats, `Decimal`, `Fraction` and text as integer
+fields was shown redundant (`operator.index` refuses them) and removed.
