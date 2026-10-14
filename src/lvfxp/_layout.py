@@ -62,7 +62,7 @@ class Layout:
         integer_word_length: SupportsIndex,
         signed: bool = True,
         delta: Number | None = None,
-        offset: Number = 0,
+        offset: Number = Decimal(0),
     ) -> None:
         for name, value in zip(
             _FIELDS, (word_length, integer_word_length, signed, delta, offset), strict=True
@@ -71,7 +71,7 @@ class Layout:
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        # Also run by the __init__ of a dataclass subclass, and after unpickling.
+        # Also run by the __init__ of a dataclass subclass (not on unpickling, as in 0.3.0).
         wl = as_int(self.word_length, "word_length")
         if not 1 <= wl <= MAX_WORD_LENGTH:
             raise FxpError(f"word_length must be between 1 and {MAX_WORD_LENGTH}, got {short(wl)}")

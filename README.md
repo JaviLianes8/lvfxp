@@ -103,9 +103,10 @@ different word length or signedness raise instead of decoding to a wrong value.
 
 ### What is verified, and what is not
 
-- **Value math: verified.** Word length, integer word length, signedness, the scaling
-  `2 ** (iwl - wl)` and the names of the rounding and overflow modes follow NI's
-  documentation, and a contract test
+- **Value math: derived and checked.** Word length, integer word length (the number of
+  integer bits), signedness and the names of the rounding and overflow modes follow NI's
+  documentation; the scaling `2 ** (iwl - wl)` follows from the number of integer bits and
+  is not captured from LabVIEW. A contract test
   checks every word of each word length up to 8 bits, at several integer word lengths,
   against independent rational arithmetic.
 - **Tie and truncate directions: derived.** NI says Round-Half-Up adds to the least
@@ -188,6 +189,8 @@ gap with a small, zero-dependency, exact codec.
   flattened numeric data is big-endian; arrays start with 32-bit dimension sizes.
 - NI, [Numeric Data Types Table](https://www.ni.com/docs/en-US/bundle/labview/page/numeric-data-types-table.html):
   fixed-point takes 64 bits of storage on disk, or 72 with an overflow status.
+- NI, [Configuring Fixed-Point Numbers](https://www.ni.com/docs/en-US/bundle/labview/page/configuring-fixed-point-numbers.html):
+  the integer word length is the number of integer bits used for the value.
 - NI, [Fixed-Point Numbers](https://www.ni.com/docs/en-US/bundle/labview/page/fixed-point-numbers.html):
   word length between 1 and 64 bits, signed or unsigned.
 - NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/using-the-fixed-point-data-type-fpga-module.html):

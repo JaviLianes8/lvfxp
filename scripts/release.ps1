@@ -23,7 +23,9 @@ if (-not $token) {
 
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 python -m build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python -m twine check --strict dist/*
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $env:TWINE_USERNAME = "__token__"
 $env:TWINE_PASSWORD = $token
