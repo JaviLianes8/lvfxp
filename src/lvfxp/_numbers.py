@@ -96,7 +96,7 @@ def as_int(value: object, name: str) -> int:
 
     Any integer type (``int`` subclasses, NumPy integers) is accepted through ``__index__``.
     """
-    if isinstance(value, (bool, float, Decimal, Fraction, str)):
+    if isinstance(value, bool):  # operator.index refuses floats, Decimal, Fraction, text
         raise FxpError(f"{name} must be an int, not {type_name(value)}")
     try:
         number = operator.index(value)  # type: ignore[arg-type]
