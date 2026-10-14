@@ -70,9 +70,11 @@ are one-call shortcuts for the common `<signed, wl, iwl>` layout.
 ## Rounding and overflow
 
 Encoding divides exactly over rationals and rounds once. The default is LabVIEW's
-Round-Half-Even. `LV_ROUND_HALF_UP` sends ties toward positive infinity, as LabVIEW does;
+Round-Half-Even. `LV_ROUND_HALF_UP` sends ties toward positive infinity;
 `decimal.ROUND_HALF_UP` sends them away from zero. `LV_TRUNCATE` drops low bits, which
-rounds toward negative infinity. Any other `decimal` rounding mode is accepted too.
+rounds toward negative infinity. NI describes Round-Half-Up as adding to the least
+significant bit and Truncate as removing bits; both directions follow from two's-complement
+arithmetic, and neither was captured from LabVIEW. Any other `decimal` rounding mode is accepted too.
 
 ```pycon
 >>> from lvfxp import LV_ROUND_HALF_UP, LV_TRUNCATE
@@ -109,8 +111,9 @@ decoding to a wrong value.
 Decimal('15.578125')
 ```
 
-`pack_array` and `unpack_array` write and read a flattened 1-D array: a big-endian signed
-32-bit count, then the 8-byte elements; the length must match the count exactly.
+`pack_array` and `unpack_array` write and read a flattened 1-D array: a big-endian
+32-bit count, then the 8-byte elements; the length must match the count exactly. NI calls the
+count a 32-bit integer; lvfxp reads it as signed and refuses a negative count.
 `pack_compact` and `unpack_compact` store the word in `ceil(word_length / 8)` bytes, a dense
 form of lvfxp's own that LabVIEW does not read or write; unpacking it ignores bits above the
 word. Every byte argument may be `bytes`, `bytearray` or any `memoryview`, read as its raw
@@ -174,7 +177,8 @@ traceback.
 
 ## What is verified
 
-- Value math, rounding and overflow follow NI's documentation; the contract tests check
+- Value math and the rounding and overflow mode names follow NI's documentation (the tie
+  and truncate directions are derived, see above); the contract tests check
   every word of each word length up to 8 bits, at several integer word lengths, against
   independent rational arithmetic.
 - The 8-byte form is checked against front-panel datalog files LabVIEW 2026 wrote on the

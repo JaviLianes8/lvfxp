@@ -105,10 +105,11 @@ def unflatten_array(data: Bytes, word_length: int, signed: bool) -> list[int]:
         raise FxpError(f"a flattened array starts with a {_COUNT_SIZE}-byte count")
     count = int.from_bytes(data[:_COUNT_SIZE], "big", signed=True)
     body = data[_COUNT_SIZE:]
-    if count < 0 or len(body) != count * FLATTENED_SIZE:
+    if count < 0:
+        raise FxpError(f"array count must not be negative, got {count}")
+    if len(body) != count * FLATTENED_SIZE:
         raise FxpError(
-            f"array count {count} needs {max(count, 0) * FLATTENED_SIZE} element bytes,"
-            f" got {len(body)}"
+            f"array count {count} needs {count * FLATTENED_SIZE} element bytes, got {len(body)}"
         )
     return [
         unflatten_word(body[start : start + FLATTENED_SIZE], word_length, signed)

@@ -19,7 +19,7 @@ def test_an_array_with_trailing_bytes_is_refused() -> None:
 
 
 def test_the_array_count_is_read_as_a_signed_32_bit_integer() -> None:
-    with pytest.raises(FxpError, match="array count -1 needs 0 element bytes"):
+    with pytest.raises(FxpError, match="array count must not be negative, got -1"):
         FxpSpec(8, 5).unpack_array(bytes.fromhex("ffffffff"))
 
 

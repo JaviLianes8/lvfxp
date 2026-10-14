@@ -25,6 +25,7 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   them and can still be unpacked into a call.
 - `FxpSpec.delta` and `FxpSpec.offset` are typed `Decimal | None` and `Decimal`, which is
   what they always held; the constructor still takes any number.
+- A negative array count is refused as such ("array count must not be negative").
 - Messages for wide integers read `a code of 136 bits` and `a word of 16610 bits`.
 - Byte arguments accept any bytes-like buffer and read its raw bytes: a `memoryview` of any
   format (an `array("H")`, for example) counts its bytes, not its items. The type hints now

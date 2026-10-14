@@ -104,9 +104,14 @@ different word length or signedness raise instead of decoding to a wrong value.
 ### What is verified, and what is not
 
 - **Value math: verified.** Word length, integer word length, signedness, the scaling
-  `2 ** (iwl - wl)`, rounding and overflow follow NI's documentation, and a contract test
+  `2 ** (iwl - wl)` and the names of the rounding and overflow modes follow NI's
+  documentation, and a contract test
   checks every word of each word length up to 8 bits, at several integer word lengths,
   against independent rational arithmetic.
+- **Tie and truncate directions: derived.** NI says Round-Half-Up adds to the least
+  significant bit and Truncate removes bits; that ties go toward positive infinity and
+  Truncate rounds toward negative infinity follows from two's-complement arithmetic. It is
+  not stated by NI and was not captured.
 - **8-byte layout: verified.** NI documents the 64-bit, sign-extended format and
   big-endian flattening, and its numeric table gives fixed-point 64 bits of storage on
   disk. Real LabVIEW 2026 captures agree byte for byte: front-panel datalog records
@@ -182,9 +187,9 @@ gap with a small, zero-dependency, exact codec.
   flattened numeric data is big-endian; arrays start with 32-bit dimension sizes.
 - NI, [Numeric Data Types Table](https://www.ni.com/docs/en-US/bundle/labview/page/numeric-data-types-table.html):
   fixed-point takes 64 bits of storage on disk, or 72 with an overflow status.
-- NI, [Fixed-Point Numbers (LabVIEW 2018 Help)](https://zone.ni.com/reference/en-XX/help/371361R-01/lvhowto/fixed_point_numbers/):
+- NI, [Fixed-Point Numbers](https://www.ni.com/docs/en-US/bundle/labview/page/fixed-point-numbers.html):
   word length between 1 and 64 bits, signed or unsigned.
-- NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/lvfpgaconcepts/fpgafixedpoint.html):
+- NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/using-the-fixed-point-data-type-fpga-module.html):
   Truncate, Round-Half-Up (asymmetric) and Round-Half-Even (the fixed-point default);
   Saturate and Wrap.
 - NI, [To Fixed-Point](https://www.ni.com/docs/en-US/bundle/labview-api-ref/page/functions/to-fixed-point.html):
