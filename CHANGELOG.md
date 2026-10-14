@@ -23,11 +23,13 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   format (an `array("H")`, for example) counts its bytes, not its items. The type hints now
   say `bytes | bytearray | memoryview`, matching what 0.3.0 already accepted at run time.
 - Error messages quote at most 40 characters of a value, and describe integers wider than
-  64 bits by their size, so huge input can no longer produce a huge message (or, for very
-  large integers, a `ValueError` from Python's integer printing limit).
-- Results no longer depend on the caller's `decimal` context: a small `prec`, `Emax` or
-  `Emin`, or disabled traps, used to change or break `min_value`, `max_value` and
-  `decode`, and bad text set the caller's `InvalidOperation` flag.
+  64 bits by their size, so huge input can no longer produce a huge message. A word or an
+  out-of-range code beyond Python's 4300-digit printing limit made 0.3.0 raise a plain
+  `ValueError` from the message itself; it is now `FxpError` or `FxpOverflowError`.
+- Results no longer depend on the caller's `decimal` context: a small `Emax` made
+  `min_value`, `max_value` and `decode` raise `decimal.Overflow` for large values, disabled
+  traps turned "not a number" into "must be finite", and bad text set the caller's
+  `InvalidOperation` flag.
 - An integer value wider than about 34000 bits is refused at once with `FxpError` instead of
   being converted first.
 - The `lvfxp` command exits 1 quietly when its reader closes the pipe, and cuts error

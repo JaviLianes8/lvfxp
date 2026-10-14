@@ -64,9 +64,12 @@ The sixteen public names of 0.3.0 are kept with the same signatures and defaults
   run time (`mypy --strict` flagged its own test of that), and a `memoryview` is read as its
   raw bytes whatever its item format.
 - Error messages are bounded (40 characters of a value, wide integers described by size); in
-  0.3.0 a huge value produced a huge message, and an out-of-range code wider than about 14000
-  bits made the message itself raise a plain `ValueError`.
-- Results no longer depend on the caller's `decimal` context.
+  0.3.0 a huge value produced a huge message, and a word or out-of-range code beyond Python's
+  4300-digit printing limit (`from_fxp(10**5000, 8, 5)`, `to_fxp("1e9000", 8, -4000)`) made
+  the message itself raise a plain `ValueError`, checked against PyPI 0.3.0.
+- Results no longer depend on the caller's `decimal` context; with PyPI 0.3.0 a context with
+  `Emax=10` made `FxpSpec(64, 64, False).max_value` raise `decimal.Overflow`, and every bad
+  text set the caller's `InvalidOperation` flag.
 - `python -m lvfxp`; the command exits 1 quietly when its reader closes the pipe.
 - The value math and the byte forms moved into `_layout.py` and `_spec.py` so every source
   file stays under 200 lines; `FxpSpec` is the same frozen dataclass.
