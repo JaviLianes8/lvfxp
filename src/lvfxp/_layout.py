@@ -9,7 +9,7 @@ from fractions import Fraction
 from typing import SupportsIndex, TypedDict
 
 from ._errors import FxpError
-from ._numbers import Number, as_decimal, as_fraction, as_int, describe, digits, short
+from ._numbers import Number, as_decimal, as_fraction, as_int, as_items, describe, digits, short
 from ._quantize import LV_ROUND_HALF_EVEN, check_rounding, fit, overflow_mode, round_exact
 
 MAX_WORD_LENGTH = 64
@@ -85,7 +85,9 @@ class Layout:
         exponent = self.integer_word_length - self.word_length
         if exponent >= 0:
             return Decimal(2**exponent)
-        return Decimal(f"{5**-exponent}E{exponent}")  # exact: scaleb would round
+        # 2**e == 5**-e * 10**e, exact in a private context and without int-to-str conversion.
+        context = Context(prec=1 - exponent, Emax=999_999, Emin=-999_999)
+        return context.scaleb(Decimal(5**-exponent), Decimal(exponent))
 
     @property
     def _coded_min(self) -> int:
@@ -185,7 +187,7 @@ class Layout:
         [0, 127, 127]
         """
         options: EncodeOptions = {"clamp": clamp, "overflow": overflow, "rounding": rounding}
-        return [self.encode(value, **options) for value in values]
+        return [self.encode(value, **options) for value in as_items(values, "values")]
 
     def decode_many(self, words: Iterable[SupportsIndex]) -> list[Decimal]:
         """Decode each word with :meth:`decode`, reusing this layout.
@@ -194,4 +196,4 @@ class Layout:
         >>> FxpSpec(4, 3).decode_many([0b0101, 0b1011])
         [Decimal('2.5'), Decimal('-2.5')]
         """
-        return [self.decode(word) for word in words]
+        return [self.decode(word) for word in as_items(words, "words")]

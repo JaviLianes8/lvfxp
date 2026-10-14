@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import array
 import decimal
+import sys
 from decimal import Decimal
+from fractions import Fraction
 
 import pytest
 
@@ -135,3 +137,23 @@ def test_option_and_overflow_messages_stay_short() -> None:
     with pytest.raises(FxpError, match="a code of 33906 bits") as raised:
         to_fxp("1e9000", 8, -4000)
     assert len(str(raised.value)) < 200
+
+
+def test_the_int_string_limit_of_the_caller_changes_nothing() -> None:
+    limit = sys.get_int_max_str_digits()
+    sys.set_int_max_str_digits(640)
+    try:
+        spec = FxpSpec(64, -4096)
+        assert Fraction(spec.resolution) == Fraction(1, 2**4160)
+        assert to_fxp(1, 64, -4096, clamp=True) == 2**63 - 1
+        assert Fraction(spec.min_value) == -(2**63) * Fraction(1, 2**4160)
+    finally:
+        sys.set_int_max_str_digits(limit)
+
+
+@pytest.mark.parametrize("items", [5, None, "12", b"\x01\x02", bytearray(2)])
+def test_batch_calls_want_an_iterable_of_items(items: object) -> None:
+    spec = FxpSpec(8, 5)
+    for call in (spec.encode_many, spec.decode_many, spec.pack_array):
+        with pytest.raises(FxpError, match="iterable"):
+            call(items)  # type: ignore[arg-type]

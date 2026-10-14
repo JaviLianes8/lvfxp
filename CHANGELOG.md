@@ -40,8 +40,15 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   `InvalidOperation` flag.
 - An integer value wider than about 34000 bits is refused at once with `FxpError` instead of
   being converted first.
-- The `lvfxp` command exits 1 quietly when its reader closes the pipe, and cuts error
-  messages at 300 characters.
+- The `lvfxp` command exits 1 quietly when its reader closes the pipe (and keeps its exit
+  code when stderr is closed), and cuts data and usage error messages at 300 characters.
+- `lvfxp decode` without hex or `--word`, or with both, and `lvfxp encode --clamp --overflow
+  wrap` are usage errors now: exit 2 with the usage line, instead of exit 1.
+- `encode_many`, `decode_many` and `pack_array` refuse text, bytes-like objects and
+  non-iterables with `FxpError`; 0.3.0 packed the characters of `"12"` and raised `TypeError`
+  for `5`.
+- Very fine resolutions no longer depend on `sys.set_int_max_str_digits`: with a limit of 640
+  digits, 0.3.0 raised `ValueError` for `FxpSpec(64, -4096).resolution`.
 
 - The value math moved into a private base class; tracebacks and messages still name
   `FxpSpec`.

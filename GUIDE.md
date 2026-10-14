@@ -138,7 +138,8 @@ where the status sits, so 9-byte input raises `FxpError` with an explanation.
 | `FxpError` | every other refusal: bad layout fields, bad values or options, a word that does not fit, bytes of the wrong size, type or extension |
 
 `FxpOverflowError` is an `FxpError`, which is a `ValueError`, so `except ValueError` catches
-both. Messages quote at most 40 characters of a value and describe integers wider than
+both. An exception raised by the caller's own object (an `__index__` that fails, say)
+propagates unchanged. Messages quote at most 40 characters of a value and describe integers wider than
 64 bits by their size, so hostile input cannot produce a huge message.
 
 ```pycon
@@ -171,7 +172,8 @@ flattened bytes: 8
 compact bytes: 1
 ```
 
-Data errors print `lvfxp: <message>` to stderr and exit 1; usage errors exit 2. When the
+Data errors print `lvfxp: <message>` to stderr and exit 1; usage errors (including `decode`
+without hex or `--word`, or with both, and `--clamp` with `--overflow wrap`) exit 2. When the
 reader of the output goes away (as with `| head -c 0`), the command exits 1 without a
 traceback.
 

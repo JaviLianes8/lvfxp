@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import operator
+from collections.abc import Iterable, Iterator
 from decimal import Context, Decimal, InvalidOperation
 from fractions import Fraction
+from typing import TypeVar
 
 from ._errors import FxpError
 
 Number = int | float | Decimal | str
+T = TypeVar("T")
 Bytes = bytes | bytearray | memoryview
 
 MAX_EXPONENT = 10_000
@@ -109,6 +112,16 @@ def as_int(value: object, name: str) -> int:
     except TypeError:
         raise FxpError(f"{name} must be an int, not {type_name(value)}") from None
     return int.__index__(number)
+
+
+def as_items(values: Iterable[T], name: str) -> Iterator[T]:
+    """Iterate ``values``; text, bytes-like objects and non-iterables raise FxpError."""
+    if isinstance(values, (str, bytes, bytearray, memoryview)):
+        raise FxpError(f"{name} must be an iterable of items, not {type_name(values)}")
+    try:
+        return iter(values)
+    except TypeError:
+        raise FxpError(f"{name} must be an iterable, not {type_name(values)}") from None
 
 
 def digits(value: Decimal) -> int:
