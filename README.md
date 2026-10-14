@@ -1,7 +1,11 @@
 # lvfxp
 
 Encode and decode LabVIEW fixed-point (FXP) numbers and their flattened bytes, exactly, in
-pure Python.
+pure Python, with no dependencies. Python 3.10 or newer.
+
+The full reference is the [guide](https://github.com/JaviLianes8/lvfxp/blob/main/GUIDE.md);
+every release is described in the
+[changelog](https://github.com/JaviLianes8/lvfxp/blob/main/CHANGELOG.md).
 
 ## Install
 
@@ -44,7 +48,7 @@ Decoding returns a `Decimal` that is exact at every width, including the `2 ** -
 resolution of a `<64, 0>` word. Floats are read through their shortest repr, so `0.1`
 means `Decimal("0.1")`. Bad input (text that is not a number, NaN, infinity, a decimal exponent
 beyond +/-10000, a word that does not fit, data that is not bytes) raises `FxpError`, a
-`ValueError`.
+`ValueError`. Results never depend on the caller's `decimal` context.
 
 ## Rounding and overflow
 
@@ -105,10 +109,11 @@ different word length or signedness raise instead of decoding to a wrong value.
   against independent rational arithmetic.
 - **8-byte layout: verified.** NI documents the 64-bit, sign-extended format and
   big-endian flattening, and its numeric table gives fixed-point 64 bits of storage on
-  disk. A real LabVIEW 2026 capture agrees byte for byte: front-panel datalog records
+  disk. Real LabVIEW 2026 captures agree byte for byte: front-panel datalog records
   written by the shipped `Fixed-Point Cast.vi` example store each fixed-point value as 8
   big-endian bytes, signed words sign extended and an unsigned `<+, 10, 4>` word with its
-  top bit set zero extended (`tests/fixtures/labview2026`). The output of the Flatten To
+  top bit set zero extended; one capture holds the example's Integer to Fixed-Point Cast
+  of every I8 value, 768 flattened words (`tests/fixtures/labview2026`). The output of the Flatten To
   String function itself was not captured; NI Community reports of 8-byte flattened
   fixed-point strings (see Sources) match the same form.
 - **1-D arrays: derived, not captured.** `pack_array`/`unpack_array` combine NI's
@@ -126,7 +131,7 @@ or links; LabVIEW does not read or write it. Unpacking it ignores bits above the
 
 ## Command line
 
-Installing the package adds an `lvfxp` command.
+Installing the package adds an `lvfxp` command (`python -m lvfxp` works too).
 
 ```
 $ lvfxp encode 15.875 --wl 8 --iwl 5
@@ -190,7 +195,7 @@ gap with a small, zero-dependency, exact codec.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/lvfxp/blob/main/LICENSE).
 
 ## Links
 

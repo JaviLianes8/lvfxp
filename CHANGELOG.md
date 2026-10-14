@@ -6,7 +6,45 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.3.0]
+## [1.0.0] - 2026-10-14
+
+The public API is now stable: the sixteen names in `lvfxp.__all__`, their signatures,
+defaults and error types follow Semantic Versioning from this release on. The flattened byte
+form, the compact form, the array form, the rounding and overflow modes and the `lvfxp`
+command keep their 0.3.0 behaviour. See the upgrade notes in
+[GUIDE.md](https://github.com/JaviLianes8/lvfxp/blob/main/GUIDE.md#upgrading-from-030).
+
+### Changed
+
+- Integer arguments (`word_length`, `integer_word_length`, `word`) accept any integer type
+  through `__index__` (NumPy integers, `int` subclasses) and are stored as plain `int`;
+  floats, `Decimal`, text and booleans still raise `FxpError`.
+- Byte arguments accept any bytes-like buffer and read its raw bytes: a `memoryview` of any
+  format (an `array("H")`, for example) counts its bytes, not its items. The type hints now
+  say `bytes | bytearray | memoryview`, matching what 0.3.0 already accepted at run time.
+- Error messages quote at most 40 characters of a value, and describe integers wider than
+  64 bits by their size, so huge input can no longer produce a huge message (or, for very
+  large integers, a `ValueError` from Python's integer printing limit).
+- Results no longer depend on the caller's `decimal` context: a small `prec`, `Emax` or
+  `Emin`, or disabled traps, used to change or break `min_value`, `max_value` and
+  `decode`, and bad text set the caller's `InvalidOperation` flag.
+- An integer value wider than about 34000 bits is refused at once with `FxpError` instead of
+  being converted first.
+- The `lvfxp` command exits 1 quietly when its reader closes the pipe, and cuts error
+  messages at 300 characters.
+
+### Added
+
+- `python -m lvfxp` runs the command line tool.
+- Every public name and method carries a runnable example; GUIDE.md documents layouts,
+  byte forms, rounding, errors and the command line.
+- Python 3.10 to 3.14 classifiers and `Development Status :: 5 - Production/Stable`.
+- A LabVIEW 2026 capture of all 256 `Integer to Fixed-Point Cast` results of the shipped
+  `Fixed-Point Cast.vi` example, decoded and re-packed byte for byte by the tests.
+
+## [0.3.0] - 2026-10-12
+
+The first release published to PyPI.
 
 This release corrects the flattened byte layout. 0.2.0 described its `ceil(wl / 8)`-byte
 output as LabVIEW's flattened form; it is not, and bytes from 0.2.0 `pack` are not
@@ -50,6 +88,9 @@ LabVIEW data.
 
 ## [0.2.0]
 
+Not published to PyPI.
+
+
 - Flattened byte codec: `pack_fxp` and `unpack_fxp`, plus `FxpSpec.pack`, `FxpSpec.unpack`
   and `FxpSpec.byte_length`, writing the word in `ceil(word_length / 8)` big-endian bytes.
   Corrected in 0.3.0: this is not LabVIEW's flattened form.
@@ -57,6 +98,9 @@ LabVIEW data.
 - New `lvfxp` command line tool with `encode` and `decode` subcommands and `--version`.
 
 ## [0.1.0]
+
+Not published to PyPI.
+
 
 - First release: encode and decode LabVIEW fixed-point (FXP) numbers in pure Python.
 - `to_fxp` and `from_fxp` convert between a real value and the two's-complement word for a

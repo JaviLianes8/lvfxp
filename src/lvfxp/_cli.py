@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
@@ -164,9 +165,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         output = _COMMANDS[args.command](args)
     except (FxpError, ValueError, ArithmeticError) as exc:
-        print(f"lvfxp: {exc}", file=sys.stderr)
+        print(f"lvfxp: {str(exc)[:300]}", file=sys.stderr)
         return 1
-    print(output)
+    try:
+        print(output, flush=True)
+    except OSError:  # the reader went away (EPIPE, or EINVAL on Windows): stop quietly
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 1
     return 0
 
 

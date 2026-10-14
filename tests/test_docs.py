@@ -7,12 +7,17 @@ import importlib
 import inspect
 import pkgutil
 import re
+import shlex
+from pathlib import Path
 
 import pytest
 
 import lvfxp
+from lvfxp._cli import main
 
-_MODULES = ["lvfxp"] + [f"lvfxp.{m.name}" for m in pkgutil.iter_modules(lvfxp.__path__)]
+_MODULES = ["lvfxp"] + [
+    f"lvfxp.{m.name}" for m in pkgutil.iter_modules(lvfxp.__path__) if m.name != "__main__"
+]
 _GLOBALS = {name: getattr(lvfxp, name) for name in lvfxp.__all__}
 
 
@@ -52,3 +57,39 @@ def test_the_doctests_cover_every_public_name() -> None:
     )
     for name in lvfxp.__all__:
         assert re.search(rf"\b{name}\b", examples), name
+
+
+_ROOT = Path(__file__).resolve().parents[1]
+_GUIDE = (_ROOT / "GUIDE.md").read_text(encoding="utf-8")
+
+
+def test_guide_examples_run_and_print_what_they_show() -> None:
+    blocks = re.findall(r"```pycon\n(.*?)```", _GUIDE, re.S)
+    assert len(blocks) >= 8
+    parser, runner = doctest.DocTestParser(), doctest.DocTestRunner()
+    session: dict[str, object] = {}  # one reader's session: later blocks reuse earlier names
+    for number, block in enumerate(blocks):
+        test = parser.get_doctest(block, session, f"GUIDE.md[{number}]", "GUIDE.md", 0)
+        runner.run(test, clear_globs=False)
+        session.update(test.globs)
+    assert runner.summarize(verbose=False).failed == 0
+
+
+def _guide_transcript() -> list[tuple[list[str], list[str]]]:
+    shell = re.search(r"## Command line.*?```\n(.*?)```", _GUIDE, re.S)
+    assert shell is not None
+    runs: list[tuple[list[str], list[str]]] = []
+    for line in shell.group(1).splitlines():
+        if line.startswith("$ lvfxp "):
+            runs.append((shlex.split(line)[2:], []))
+        else:
+            runs[-1][1].append(line)
+    return runs
+
+
+@pytest.mark.parametrize(("args", "expected"), _guide_transcript())
+def test_guide_transcript_matches(
+    capsys: pytest.CaptureFixture[str], args: list[str], expected: list[str]
+) -> None:
+    assert main(args) == 0
+    assert capsys.readouterr().out.splitlines() == expected
