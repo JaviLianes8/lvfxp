@@ -10,7 +10,7 @@ Progress:
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [x] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
 - [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): all five lenses PASS at their last rounds; independent review round 1 done, re-review open
-- [ ] Gates (item 15)
+- [x] Gates (item 15)
 - [ ] PR and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
 ## Scorecard
@@ -32,8 +32,8 @@ Progress:
 | 13 | pyproject | PASS | 1.0.0, Production/Stable, 3.10 to 3.14, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` (contract-tested) |
 | 14 | sdist and wheel contents | PASS | wheel: package, `py.typed`, LICENSE, metadata; sdist: source, tests with the LabVIEW captures and manifest, docs; no scripts or process notes |
 | 15 | Gates exit 0 alone | PASS | `ruff format --check .`, `ruff check .`, `mypy --strict src`, `pytest`, each run alone |
-| 16 | Independent reviewer | see below | review 1 FAIL (8 surviving mutations, report counts); fixed in 76c2f17 and a73a5c3; re-review below |
-| 17 | PR, trace guard | ready | see the end of this report; merge and PyPI publish left to the maintainer |
+| 16 | Independent reviewer | see below | review 1 FAIL (8 surviving mutations, report counts), fixed in 76c2f17 and a73a5c3; review 2 FAIL (3 surviving mutations, report details), fixed in the next commit; review 3 below |
+| 17 | PR, trace guard | pending | the PR from `release/1.0.0` and the trace guard come last; merge and PyPI publish are left to the maintainer |
 | 18 | Mutation round | PASS | author: 58 mutations at 664ddc5, 55 killed, 3 equivalent; blind lens e: 94, then 135 + 13, then 82 on the final source with no survivor left; reviewer: 40, 8 survivors closed |
 | 19 | Five QA lenses | PASS | a (round 6), b and d (round 2), c and e (final round on the final source) all PASS after their findings were fixed and re-verified |
 
@@ -205,3 +205,4 @@ check).
 | Review | Head | Verdict | Findings and outcome |
 | --- | --- | --- | --- |
 | 1 | 664ddc5 | FAIL | items 1 to 5, 7 to 15 and 19 PASS; 40 mutations of its own, 30 killed, 2 equivalent, 8 survived (text key of the cached resolution, stored `delta` type, `decode` lower bound, rounding names, sequence-protocol batches, faked integer class, float subclass repr, `bytearray` subclass); a hang-prone bound test; survivor count and progress list in this report. Fixed in 76c2f17 and a73a5c3 |
+| 2 | fc044aa | FAIL | the four gates each exit 0 alone (648 tests); its 40 earlier mutations re-applied: 38 killed, 2 equivalent, the 8 former survivors killed by `tests/test_contract_review.py`; 19 new: 16 killed, 3 survived (a `__getitem__` set on the instance, a 40-character type name cut one early, the huge-integer guard widened tenfold); item 17 described as ready, the gates progress line unticked. Contracts in `tests/test_contract_review_two.py`, report fixed |
