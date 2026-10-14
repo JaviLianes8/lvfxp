@@ -17,25 +17,25 @@ Progress:
 
 | # | Item | Verdict | Evidence |
 | --- | --- | --- | --- |
-| 1 | API reviewed for stability | open | |
-| 2 | `__all__` exact | open | |
-| 3 | Docstrings with runnable examples, doctests pass | open | |
-| 4 | Typed end to end | FAIL on 0.3.0 | `mypy --strict src tests`: `unpack` accepts a `memoryview` at run time but its signature says `bytes | bytearray` |
-| 5 | Typed, documented, safe errors | open | |
-| 6 | Contract asserts the full promise | open | |
-| 7 | Real ground truth | in progress | five files written by LabVIEW 2026 on this PC (see below) |
-| 8 | Real e2e incl. PyPI upgrade | open | |
-| 9 | Seeded fuzz, no crash, hang or blow-up | open | |
-| 10 | Every interpreter on this PC | open | |
-| 11 | README | open | |
-| 12 | CHANGELOG dated 1.0.0 | open | |
-| 13 | pyproject | open | |
-| 14 | sdist and wheel contents | open | |
-| 15 | Gates exit 0 alone | open | |
-| 16 | Independent reviewer | open | |
-| 17 | PR, trace guard | open | |
-| 18 | Mutation round | open | |
-| 19 | Five QA lenses | open | |
+| 1 | API reviewed for stability | PASS | same 16 names as 0.3.0; integer arguments typed `SupportsIndex`, encode options explicit keyword-only parameters, `delta`/`offset` typed `Decimal`; subclasses, copies and pickles (both ways with 0.3.0) work; every change in CHANGELOG 1.0.0 and the guide's upgrade section; lens a PASS at round 6 |
+| 2 | `__all__` exact | PASS | `test_contract::test_all_lists_exactly_the_public_api`; no other public attribute (`annotations` removed) |
+| 3 | Docstrings with runnable examples, doctests pass | PASS | every module doctested, the inherited methods included (`test_docs`); every public name and method has `>>>`; README and GUIDE examples and transcripts executed by the tests |
+| 4 | Typed end to end | PASS | `mypy --strict src tests` clean; `py.typed` shipped; strict outside consumers with NumPy types clean; `get_type_hints` on every public name and method |
+| 5 | Typed, documented, safe errors | PASS | GUIDE error table; messages quote at most 40 characters and describe integers wider than 64 bits by size; the caller's decimal context and integer-string limit change nothing |
+| 6 | Contract asserts the full promise | PASS | 648 tests: a promise test per public name, a rational oracle, both LabVIEW capture sets, CLI in process and by subprocess, and the contracts from three blind mutation rounds and the review |
+| 7 | Real ground truth | PASS | five datalog files written by LabVIEW 2026 on this PC, 260 records, the 256-value sweep captured 2026-10-14 (manifest with SHA-256); NI pages re-fetched by two reviewers; independent Fraction oracles agree |
+| 8 | Real e2e incl. PyPI upgrade | PASS | wheel in clean venvs, suite from the sdist with `src` removed against the built wheel, sabotaged CLI caught, PyPI 0.3.0 upgraded in place with every difference documented |
+| 9 | Seeded fuzz, no crash, hang or blow-up | PASS | seeded oracle and fuzz tests in the suite; lens c rounds totalling about 5.5 million calls, every input dimension linear or capped |
+| 10 | Every interpreter | PASS | 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.6, 3.14.8 and 3.14.8t from the installed wheel (lens d and the reviewer, on the build machines); this PC's own 3.13.2 runs the gates |
+| 11 | README | PASS | `twine check --strict` PASSED; absolute links tested; problem, verified why (autolv and npTDMS sources checked), install, quick start, GUIDE and CHANGELOG links |
+| 12 | CHANGELOG dated 1.0.0 | PASS | `## [1.0.0] - 2026-10-14` with the stable surface and every behaviour change |
+| 13 | pyproject | PASS | 1.0.0, Production/Stable, 3.10 to 3.14, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` (contract-tested) |
+| 14 | sdist and wheel contents | PASS | wheel: package, `py.typed`, LICENSE, metadata; sdist: source, tests with the LabVIEW captures and manifest, docs; no scripts or process notes |
+| 15 | Gates exit 0 alone | PASS | `ruff format --check .`, `ruff check .`, `mypy --strict src`, `pytest`, each run alone |
+| 16 | Independent reviewer | see below | review 1 FAIL (8 surviving mutations, report counts); fixed in 76c2f17 and a73a5c3; re-review below |
+| 17 | PR, trace guard | ready | see the end of this report; merge and PyPI publish left to the maintainer |
+| 18 | Mutation round | PASS | author: 58 mutations at 664ddc5, 55 killed, 3 equivalent; blind lens e: 94, then 135 + 13, then 82 on the final source with no survivor left; reviewer: 40, 8 survivors closed |
+| 19 | Five QA lenses | PASS | a (round 6), b and d (round 2), c and e (final round on the final source) all PASS after their findings were fixed and re-verified |
 
 ## Ground truth (item 7)
 
@@ -199,3 +199,9 @@ check).
 | c + e | final (new reviewer) | 70a7054 | c FAIL (1 low), e FAIL until its contracts were added | c: 240,000 seeded calls (half under a hostile decimal context and a 640-digit limit), the shared cache under 8 threads and 16,000 layouts, 28 scaling dimensions, subprocess runs over closed streams; a type setting `__index__` or `__iter__` to `None` gave `TypeError`. e: 80 mutations designed from the final source, 55 killed, 9 proven equivalent, 16 survivors, all killed by its contracts (`tests/test_contract_strength_four.py`); it also found that the doctests of the inherited methods never ran. All fixed in the next commit |
 | c + e | final, re-applied | 620a1ba | c PASS, e PASS | c: 200,000 seeded calls (two seeds under a hostile context and a 640-digit limit), 28 scaling dimensions linear or capped, the cache flat from 1,000 to 16,000 layouts, the disabled-`__index__`/`__iter__` finding fixed. e: all 80 mutations re-applied plus 2 on the new code: 82, 73 killed, 9 proven equivalent, no survivor; suite green before and after |
 | review contracts | | 76c2f17 | added | the independent reviewer's eight surviving mutations closed by `tests/test_contract_review.py` (see the reviewer table) |
+
+## Independent reviewer (item 16)
+
+| Review | Head | Verdict | Findings and outcome |
+| --- | --- | --- | --- |
+| 1 | 664ddc5 | FAIL | items 1 to 5, 7 to 15 and 19 PASS; 40 mutations of its own, 30 killed, 2 equivalent, 8 survived (text key of the cached resolution, stored `delta` type, `decode` lower bound, rounding names, sequence-protocol batches, faked integer class, float subclass repr, `bytearray` subclass); a hang-prone bound test; survivor count and progress list in this report. Fixed in 76c2f17 and a73a5c3 |
