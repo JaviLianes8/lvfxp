@@ -62,8 +62,9 @@ word, or, for a signed layout, the already-signed code:
 (11, Decimal('-2.5'), Decimal('-2.5'))
 ```
 
-Values are numbers, not integer types: a NumPy float is a `float` and is accepted, a NumPy
-integer is not (convert it with `int()`). Words and layout fields take any integer type.
+Values are `int`, `float`, `Decimal` or `str` (subclasses included): `numpy.float64` is a
+`float` and is accepted, while `numpy.float32` and NumPy integers are not (convert them with
+`float()` or `int()`). Words and layout fields take any integer type.
 
 `encode_many` and `decode_many` apply one layout to many values; `to_fxp` and `from_fxp`
 are one-call shortcuts for the common `<signed, wl, iwl>` layout.
@@ -196,14 +197,15 @@ integer-string limit (4300 digits) is refused by the option parser, so it is a u
 
 ## Upgrading from 0.3.0
 
-Every valid 0.3.0 call keeps its result. The differences are at the edges:
+Calls give the same result as in 0.3.0 except in these cases:
 
 - Batches (`encode_many`, `decode_many`, `pack_array`) refuse text, bytes-like objects and
   non-iterables (0.3.0 encoded the characters of `"12"`), and check their options even when
   empty.
-- A NumPy float or other float subclass is read through its shortest repr; 0.3.0 raised
-  `decimal.InvalidOperation` for `numpy.float64(1.5)`.
-
+- A float subclass such as `numpy.float64` is read through its shortest repr; 0.3.0 raised
+  `decimal.InvalidOperation` for `numpy.float64(1.5)`. `numpy.float32` is not a `float` and
+  still needs `float()`.
+- A `FxpSpec` pickled by 0.3.0 loads and works; 1.0.0 pickles hold only the five fields.
 - NumPy integers and other `__index__` types are now accepted where an `int` is expected.
 - A `memoryview` whose items are wider than a byte is now read as its raw bytes; 0.3.0
   counted its items and refused or misread it.

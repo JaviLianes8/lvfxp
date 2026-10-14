@@ -16,8 +16,6 @@ length) and the LabVIEW rounding modes ``LV_ROUND_HALF_EVEN``, ``LV_ROUND_HALF_U
 255
 """
 
-from __future__ import annotations
-
 from ._codec import (
     from_fxp,
     pack_fxp,

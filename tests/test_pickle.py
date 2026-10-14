@@ -1,0 +1,65 @@
+"""Specs survive pickling, including pickles written by lvfxp 0.3.0."""
+
+from __future__ import annotations
+
+import pickle
+from decimal import Decimal
+
+import pytest
+
+import lvfxp
+from lvfxp import FxpSpec
+from lvfxp._cli import main
+
+# pickle.dumps(FxpSpec(8, 5), protocol=2) and
+# pickle.dumps(FxpSpec(8, 8, False, Decimal("0.1"), Decimal(1)), protocol=4), as written by
+# the lvfxp 0.3.0 release from PyPI.
+_PICKLED_BY_0_3_0: dict[tuple[object, ...], str] = {
+    (8, 5, True, None, Decimal(0)): (
+        "8002636c766678702e5f737065630a467870537065630a7100298171017d710228580b000000776f"
+        "72645f6c656e67746871034b085813000000696e74656765725f776f72645f6c656e67746871044b"
+        "0558060000007369676e6564710588580500000064656c746171064e58060000006f666673657471"
+        "0763646563696d616c0a446563696d616c0a7108580100000030710985710a52710b75622e"
+    ),
+    (8, 8, False, Decimal("0.1"), Decimal(1)): (
+        "80049590000000000000008c0b6c766678702e5f73706563948c07467870537065639493942981947d"
+        "94288c0b776f72645f6c656e677468944b088c13696e74656765725f776f72645f6c656e677468944b"
+        "088c067369676e656494898c0564656c7461948c07646563696d616c948c07446563696d616c949394"
+        "8c03302e3194859452948c066f666673657494680b8c0131948594529475622e"
+    ),
+}
+
+
+@pytest.mark.parametrize("fields", list(_PICKLED_BY_0_3_0))
+def test_a_spec_pickled_by_0_3_0_loads_and_works(fields: tuple[object, ...]) -> None:
+    spec = pickle.loads(bytes.fromhex(_PICKLED_BY_0_3_0[fields]))
+    fresh = FxpSpec(*fields)  # type: ignore[arg-type]
+    assert spec == fresh
+    assert (spec.resolution, spec.decode(5), spec.encode(fresh.decode(5))) == (
+        fresh.resolution,
+        fresh.decode(5),
+        5,
+    )
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_a_spec_round_trips_through_pickle_with_only_its_fields(protocol: int) -> None:
+    spec = FxpSpec(64, -4096, offset="0.5")
+    data = pickle.dumps(spec, protocol=protocol)
+    assert b"_step" not in data
+    assert b"_fractions" not in data
+    loaded = pickle.loads(data)
+    assert loaded == spec
+    assert loaded.decode(1) == spec.decode(1)
+
+
+def test_methods_of_the_public_class_pickle_and_name_it() -> None:
+    for member in (FxpSpec.encode, FxpSpec.decode, FxpSpec.pack):
+        assert pickle.loads(pickle.dumps(member)) is member
+        assert member.__module__ == "lvfxp._spec"
+    assert "annotations" not in dir(lvfxp)
+
+
+def test_usage_errors_show_the_subcommand_usage(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["decode", "--wl", "8", "--iwl", "5"]) == 2
+    assert capsys.readouterr().err.startswith("usage: lvfxp decode ")

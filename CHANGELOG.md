@@ -65,7 +65,11 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
 - A float subclass such as `numpy.float64` is read through its shortest repr; 0.3.0 raised
   `decimal.InvalidOperation` for `numpy.float64(1.5)`.
 - The project URL `Repository` is now `Source`. The sdist lists its contents explicitly: it
-  adds GUIDE.md and leaves out the scripts, process notes and git files.
+  adds GUIDE.md and leaves out the scripts, the process notes, `.github` and
+  `.gitattributes` (`.gitignore` stays, as the build backend always adds it).
+- Specs pickle as their five fields (and pickles written by 0.3.0 still load); unbound
+  methods of `FxpSpec` pickle again.
+- Usage errors print the usage line of the subcommand that was used.
 
 ### Added
 

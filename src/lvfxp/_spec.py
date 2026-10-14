@@ -30,6 +30,16 @@ class FxpSpec(Layout):
     Decimal('1.5')
     """
 
+    def __reduce__(self) -> tuple[type[FxpSpec], tuple[object, ...]]:
+        # Pickle the fields only; the derived step is rebuilt by __init__ on load.
+        fields = (self.word_length, self.integer_word_length, self.signed, self.delta)
+        return type(self), (*fields, self.offset)
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        # Pickles written by 0.3.0 carry the fields as instance state.
+        names = ("word_length", "integer_word_length", "signed", "delta", "offset")
+        Layout.__init__(self, *(state[name] for name in names))  # type: ignore[arg-type]
+
     @property
     def byte_length(self) -> int:
         """Bytes in LabVIEW's flattened form: always 8 (see :meth:`pack`).
@@ -132,3 +142,4 @@ for _name, _member in vars(Layout).items():
     _function = _member.fget if isinstance(_member, property) else _member
     if callable(_function) and hasattr(_function, "__qualname__"):
         _function.__qualname__ = f"FxpSpec.{_name}"
+        _function.__module__ = FxpSpec.__module__

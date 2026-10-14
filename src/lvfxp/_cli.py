@@ -78,7 +78,7 @@ def _parse_hex(text: str) -> bytes:
         raise FxpError(f"not valid hex: {short(text)}") from None
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def _build_parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser]]:
     parser = Parser(
         prog="lvfxp",
         description="Encode and decode LabVIEW fixed-point (FXP) numbers exactly.",
@@ -110,7 +110,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     info = subparsers.add_parser("info", help="show a layout's resolution, range and sizes")
     _add_spec(info)
-    return parser
+    return parser, {"encode": encode, "decode": decode, "info": info}
 
 
 def _run_encode(args: argparse.Namespace) -> str:
@@ -174,12 +174,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Exit codes: 0 done, 1 bad data (or the reader of the output went away), 2 bad usage.
     """
-    parser = _build_parser()
+    parser, subcommands = _build_parser()
     try:
         args = parser.parse_args(argv)
         problem = _usage_problem(args)
         if problem is not None:
-            parser.error(problem)
+            subcommands[args.command].error(problem)
     except SystemExit as stop:
         return stop.code if isinstance(stop.code, int) else 2
     try:
