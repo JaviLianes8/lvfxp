@@ -47,6 +47,7 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   `spec=`) is refused with `FxpError` instead of failing inside the conversion.
 - An exponent too large even for `decimal` (`"1e" + "9" * 19`) is reported as beyond the
   exponent bound, not as "not a number".
+- `encode_many` and `pack_array` check their options even for an empty batch.
 - A layout's resolution is computed once, so batches over very fine layouts no longer redo
   exact arithmetic per item.
 - `lvfxp decode` without hex or `--word`, or with both, and `lvfxp encode --clamp --overflow

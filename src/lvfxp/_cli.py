@@ -67,7 +67,7 @@ def _plain(value: Decimal) -> str:
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return "0" if text in ("-0", "") else text
+    return text
 
 
 def _parse_hex(text: str) -> bytes:

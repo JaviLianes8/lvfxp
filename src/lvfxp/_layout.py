@@ -23,9 +23,8 @@ from ._numbers import (
 from ._quantize import (
     LV_ROUND_HALF_EVEN,
     EncodeOptions,
-    check_rounding,
+    check_options,
     fit,
-    overflow_mode,
     round_exact,
 )
 
@@ -146,8 +145,7 @@ class Layout:
         >>> spec.encode("15.875"), spec.encode(-16), spec.encode(16, overflow="wrap")
         (127, 128, 128)
         """
-        mode = overflow_mode(clamp, overflow)
-        check_rounding(rounding)
+        mode = check_options(clamp, overflow, rounding)
         step, offset = self._fractions  # type: ignore[attr-defined]
         quotient = (as_fraction(value) - offset) / step
         coded = fit(round_exact(quotient, rounding), self.word_length, self.signed, mode)
@@ -188,6 +186,7 @@ class Layout:
         [0, 127, 127]
         """
         options: EncodeOptions = {"clamp": clamp, "overflow": overflow, "rounding": rounding}
+        check_options(clamp, overflow, rounding)  # refused even for an empty batch
         return [self.encode(value, **options) for value in as_items(values, "values")]
 
     def decode_many(self, words: Iterable[SupportsIndex]) -> list[Decimal]:

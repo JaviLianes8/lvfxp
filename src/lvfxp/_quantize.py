@@ -81,6 +81,13 @@ def overflow_mode(clamp: bool, overflow: str) -> str:
     return overflow
 
 
+def check_options(clamp: bool, overflow: str, rounding: str) -> str:
+    """Check every encode option and return the overflow mode they select."""
+    mode = overflow_mode(clamp, overflow)
+    check_rounding(rounding)
+    return mode
+
+
 def round_exact(quotient: Fraction, rounding: str) -> int:
     """Round an exact rational to an integer with a ``decimal`` or LabVIEW mode."""
     check_rounding(rounding)
