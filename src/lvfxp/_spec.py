@@ -5,17 +5,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from . import _flat
-from ._layout import EncodeOptions, Layout
+from ._layout import Layout
 from ._numbers import Bytes, Number
-
-if TYPE_CHECKING:
-    from typing_extensions import Unpack
+from ._quantize import LV_ROUND_HALF_EVEN
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class FxpSpec(Layout):
     """A LabVIEW fixed-point layout: ``<signed, word_length, integer_word_length>``.
 
@@ -51,7 +48,14 @@ class FxpSpec(Layout):
         """
         return _flat.compact_size(self.word_length)
 
-    def pack(self, value: Number, **options: Unpack[EncodeOptions]) -> bytes:
+    def pack(
+        self,
+        value: Number,
+        *,
+        clamp: bool = False,
+        overflow: str = "raise",
+        rounding: str = LV_ROUND_HALF_EVEN,
+    ) -> bytes:
         """Encode ``value`` and flatten it as LabVIEW does: 8 bytes, big-endian.
 
         The word sits in the low bits, sign extended when signed and zero extended when
@@ -60,7 +64,7 @@ class FxpSpec(Layout):
         >>> FxpSpec(8, 5).pack("-16").hex()
         'ffffffffffffff80'
         """
-        word = self.encode(value, **options)
+        word = self.encode(value, clamp=clamp, overflow=overflow, rounding=rounding)
         return _flat.flatten_word(word, self.word_length, self.signed)
 
     def unpack(self, data: Bytes) -> Decimal:
@@ -71,7 +75,14 @@ class FxpSpec(Layout):
         """
         return self.decode(_flat.unflatten_word(data, self.word_length, self.signed))
 
-    def pack_compact(self, value: Number, **options: Unpack[EncodeOptions]) -> bytes:
+    def pack_compact(
+        self,
+        value: Number,
+        *,
+        clamp: bool = False,
+        overflow: str = "raise",
+        rounding: str = LV_ROUND_HALF_EVEN,
+    ) -> bytes:
         """Encode ``value`` into ``compact_byte_length`` big-endian bytes.
 
         This is lvfxp's own dense form, not something LabVIEW reads or writes.
@@ -79,7 +90,7 @@ class FxpSpec(Layout):
         >>> FxpSpec(4, 3).pack_compact("-2.5")
         b'\\x0b'
         """
-        word = self.encode(value, **options)
+        word = self.encode(value, clamp=clamp, overflow=overflow, rounding=rounding)
         return _flat.compact_word(word, self.word_length)
 
     def unpack_compact(self, data: Bytes) -> Decimal:
@@ -90,13 +101,20 @@ class FxpSpec(Layout):
         """
         return self.decode(_flat.uncompact_word(data, self.word_length))
 
-    def pack_array(self, values: Iterable[Number], **options: Unpack[EncodeOptions]) -> bytes:
+    def pack_array(
+        self,
+        values: Iterable[Number],
+        *,
+        clamp: bool = False,
+        overflow: str = "raise",
+        rounding: str = LV_ROUND_HALF_EVEN,
+    ) -> bytes:
         """Flatten a 1-D array: a big-endian 32-bit count, then 8 bytes per element.
 
         >>> FxpSpec(8, 5).pack_array([1, -1]).hex()
         '000000020000000000000008fffffffffffffff8'
         """
-        words = self.encode_many(values, **options)
+        words = self.encode_many(values, clamp=clamp, overflow=overflow, rounding=rounding)
         return _flat.flatten_array(words, self.word_length, self.signed)
 
     def unpack_array(self, data: Bytes) -> list[Decimal]:
@@ -106,3 +124,11 @@ class FxpSpec(Layout):
         [Decimal('-1.000')]
         """
         return self.decode_many(_flat.unflatten_array(data, self.word_length, self.signed))
+
+
+# The value math lives on the private base class; name it after the public class everywhere a
+# caller can see it (tracebacks, TypeError messages for a bad keyword, help()).
+for _name, _member in vars(Layout).items():
+    _function = _member.fget if isinstance(_member, property) else _member
+    if callable(_function) and hasattr(_function, "__qualname__"):
+        _function.__qualname__ = f"FxpSpec.{_name}"

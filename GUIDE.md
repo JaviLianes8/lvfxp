@@ -26,6 +26,8 @@ Decimal('31.875')
 - `signed` must be a `bool`.
 - `delta` and `offset` describe a general fixed-point layout whose value is
   `offset + coded * delta`. Both are stored as `Decimal`; `delta` must be positive.
+- With a `delta`, the integer word length plays no part in the value; it is still stored and
+  compared, so `FxpSpec(8, 8, delta="0.1")` and `FxpSpec(8, 3, delta="0.1")` are not equal.
 - Specs are frozen dataclasses: immutable, hashable, equal when their fields are equal.
 
 ```pycon
@@ -59,6 +61,9 @@ word, or, for a signed layout, the already-signed code:
 (11, Decimal('-2.5'), Decimal('-2.5'))
 ```
 
+Values are numbers, not integer types: a NumPy float is a `float` and is accepted, a NumPy
+integer is not (convert it with `int()`). Words and layout fields take any integer type.
+
 `encode_many` and `decode_many` apply one layout to many values; `to_fxp` and `from_fxp`
 are one-call shortcuts for the common `<signed, wl, iwl>` layout.
 
@@ -79,7 +84,9 @@ rounds toward negative infinity. Any other `decimal` rounding mode is accepted t
 
 `overflow="raise"` (the default) raises `FxpOverflowError`; `"saturate"` keeps the nearest
 end of the range; `"wrap"` keeps the low bits. `clamp=True` means `"saturate"` and cannot
-be combined with `"wrap"`. LabVIEW's To Fixed-Point saturates by default; lvfxp raises by
+be combined with `"wrap"`; it is a permanent shorthand. `rounding` and `overflow` are plain
+strings in the type hints and are checked at run time (`FxpError` for an unknown name); the
+rounding constants are strings too, so they can be stored and passed around freely. LabVIEW's To Fixed-Point saturates by default; lvfxp raises by
 default so an out-of-range value never passes silently.
 
 ```pycon

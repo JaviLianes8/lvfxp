@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import time
 from decimal import Decimal
 
@@ -36,7 +37,7 @@ def test_a_long_digit_string_is_refused_for_its_size_not_saturated() -> None:
 
 
 def test_a_huge_integer_is_refused_before_any_conversion() -> None:
-    value = 1 << 4_000_000
+    value = 1 << 3_000_000  # converting it would take seconds
     start = time.perf_counter()
     with pytest.raises(FxpError, match="exponent"):
         to_fxp(value, 8, 5, overflow="saturate")
@@ -60,3 +61,19 @@ def test_cli_cuts_any_long_error_message(
     monkeypatch.setitem(_cli._COMMANDS, "info", explode)
     assert main(["info", "--wl", "8", "--iwl", "5"]) == 1
     assert capsys.readouterr().err.strip() == "lvfxp: " + "x" * 300
+
+
+def test_wide_codes_and_words_are_named_by_their_size() -> None:
+    with pytest.raises(FxpError, match=r"^value needs a code of 136 bits, outside \[-128, 127\]$"):
+        to_fxp(10**40, 8, 5)
+    with pytest.raises(FxpError, match=r"^value needs code 300, outside \[-128, 127\]$"):
+        to_fxp(300, 8, 8)
+    with pytest.raises(FxpError, match=r"^a word of 16610 bits does not fit 8 bits$"):
+        FxpSpec(8, 5).decode(10**5000)
+
+
+def test_the_public_class_name_is_what_callers_see() -> None:
+    with pytest.raises(TypeError, match=r"FxpSpec\.encode\(\) got an unexpected keyword"):
+        FxpSpec(8, 5).encode(1, bogus=1)  # type: ignore[call-arg]
+    getter = inspect.getattr_static(FxpSpec, "resolution").fget
+    assert getter.__qualname__ == "FxpSpec.resolution"

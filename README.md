@@ -168,8 +168,8 @@ type-descriptor machinery (there is no separate OpenG FXP package); that machine
 inside LabVIEW only. LabVIEW exchanges fixed-point data through TDMS files, flattened
 strings and network streams, but the Python tools that read those sources do not decode
 the FXP type: [autolv](https://pypi.org/project/autolv/) states fixed-point is not
-supported, and [npTDMS](https://pypi.org/project/npTDMS/) lists it among its unsupported
-types. General fixed-point maths packages such as `fxpmath` and `fixedpoint` implement
+supported, and [npTDMS](https://pypi.org/project/npTDMS/) has no fixed-point entry in
+[its table of TDMS data types](https://github.com/adamreeve/npTDMS/blob/master/nptdms/types.py). General fixed-point maths packages such as `fxpmath` and `fixedpoint` implement
 their own arithmetic, not LabVIEW's wire layout. `struct` and `numpy` have no type for an
 arbitrary word length with a shifting or negative integer word length. `lvfxp` fills that
 gap with a small, zero-dependency, exact codec.

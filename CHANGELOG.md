@@ -17,8 +17,15 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
 ### Changed
 
 - Integer arguments (`word_length`, `integer_word_length`, `word`) accept any integer type
-  through `__index__` (NumPy integers, `int` subclasses) and are stored as plain `int`;
-  floats, `Decimal`, text and booleans still raise `FxpError`.
+  through `__index__` (NumPy integers, `int` subclasses), are typed `SupportsIndex` and
+  stored as plain `int`; floats, `Decimal`, text and booleans still raise `FxpError`.
+- The encode options (`clamp`, `overflow`, `rounding`) are explicit keyword-only parameters
+  of every encoding function and method instead of `**options`, so `typing.get_type_hints`
+  and `help()` work on all of them. Calls are unchanged; `EncodeOptions` still describes
+  them and can still be unpacked into a call.
+- `FxpSpec.delta` and `FxpSpec.offset` are typed `Decimal | None` and `Decimal`, which is
+  what they always held; the constructor still takes any number.
+- Messages for wide integers read `a code of 136 bits` and `a word of 16610 bits`.
 - Byte arguments accept any bytes-like buffer and read its raw bytes: a `memoryview` of any
   format (an `array("H")`, for example) counts its bytes, not its items. The type hints now
   say `bytes | bytearray | memoryview`, matching what 0.3.0 already accepted at run time.
@@ -34,6 +41,11 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   being converted first.
 - The `lvfxp` command exits 1 quietly when its reader closes the pipe, and cuts error
   messages at 300 characters.
+
+- The value math moved into a private base class; tracebacks and messages still name
+  `FxpSpec`.
+- The project URL `Repository` is now `Source`, and the sdist ships the tests and the
+  LabVIEW captures.
 
 ### Added
 
@@ -92,7 +104,6 @@ LabVIEW data.
 
 Not published to PyPI.
 
-
 - Flattened byte codec: `pack_fxp` and `unpack_fxp`, plus `FxpSpec.pack`, `FxpSpec.unpack`
   and `FxpSpec.byte_length`, writing the word in `ceil(word_length / 8)` big-endian bytes.
   Corrected in 0.3.0: this is not LabVIEW's flattened form.
@@ -102,7 +113,6 @@ Not published to PyPI.
 ## [0.1.0]
 
 Not published to PyPI.
-
 
 - First release: encode and decode LabVIEW fixed-point (FXP) numbers in pure Python.
 - `to_fxp` and `from_fxp` convert between a real value and the two's-complement word for a

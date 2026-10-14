@@ -8,6 +8,7 @@ import inspect
 import pkgutil
 import re
 import shlex
+import typing
 from pathlib import Path
 
 import pytest
@@ -18,12 +19,11 @@ from lvfxp._cli import main
 _MODULES = ["lvfxp"] + [
     f"lvfxp.{m.name}" for m in pkgutil.iter_modules(lvfxp.__path__) if m.name != "__main__"
 ]
-_GLOBALS = {name: getattr(lvfxp, name) for name in lvfxp.__all__}
 
 
 @pytest.mark.parametrize("name", _MODULES)
 def test_module_doctests_pass(name: str) -> None:
-    result = doctest.testmod(importlib.import_module(name), extraglobs=_GLOBALS)
+    result = doctest.testmod(importlib.import_module(name))  # each example imports its names
     assert result.failed == 0
 
 
@@ -93,3 +93,19 @@ def test_guide_transcript_matches(
 ) -> None:
     assert main(args) == 0
     assert capsys.readouterr().out.splitlines() == expected
+
+
+@pytest.mark.parametrize("name", [n for n in lvfxp.__all__ if callable(getattr(lvfxp, n))])
+def test_type_hints_resolve_at_run_time(name: str) -> None:
+    target = getattr(lvfxp, name)
+    typing.get_type_hints(target)
+    for member in vars(target).values() if inspect.isclass(target) else []:
+        function = member.fget if isinstance(member, property) else member
+        if inspect.isfunction(function):
+            typing.get_type_hints(function)
+    if target is lvfxp.FxpSpec:
+        for base in target.__mro__[1:-1]:
+            for member in vars(base).values():
+                function = member.fget if isinstance(member, property) else member
+                if inspect.isfunction(function):
+                    typing.get_type_hints(function)

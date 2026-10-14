@@ -6,14 +6,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Context, Decimal
 from fractions import Fraction
-from typing import TYPE_CHECKING, TypedDict
+from typing import SupportsIndex, TypedDict
 
 from ._errors import FxpError
-from ._numbers import Number, as_decimal, as_fraction, as_int, digits, short
+from ._numbers import Number, as_decimal, as_fraction, as_int, describe, digits, short
 from ._quantize import LV_ROUND_HALF_EVEN, check_rounding, fit, overflow_mode, round_exact
-
-if TYPE_CHECKING:
-    from typing_extensions import Unpack
 
 MAX_WORD_LENGTH = 64
 """LabVIEW fixed-point words hold between 1 and 64 bits."""
@@ -36,39 +33,50 @@ class EncodeOptions(TypedDict, total=False):
     rounding: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Layout:
     """Fields and value math of :class:`lvfxp.FxpSpec` (documented there)."""
 
     word_length: int
     integer_word_length: int
-    signed: bool = True
-    delta: Number | None = None
-    offset: Number = Decimal(0)
+    signed: bool
+    delta: Decimal | None
+    offset: Decimal
 
-    def __post_init__(self) -> None:
-        wl = as_int(self.word_length, "word_length")
+    def __init__(
+        self,
+        word_length: SupportsIndex,
+        integer_word_length: SupportsIndex,
+        signed: bool = True,
+        delta: Number | None = None,
+        offset: Number = 0,
+    ) -> None:
+        wl = as_int(word_length, "word_length")
         if not 1 <= wl <= MAX_WORD_LENGTH:
             raise FxpError(f"word_length must be between 1 and {MAX_WORD_LENGTH}, got {short(wl)}")
-        iwl = as_int(self.integer_word_length, "integer_word_length")
+        iwl = as_int(integer_word_length, "integer_word_length")
         if abs(iwl) > MAX_INTEGER_WORD_LENGTH:
             bound = MAX_INTEGER_WORD_LENGTH
             raise FxpError(f"integer_word_length must be between -{bound} and {bound}")
-        if not isinstance(self.signed, bool):
+        if not isinstance(signed, bool):
             raise FxpError("signed must be a bool")
-        object.__setattr__(self, "word_length", wl)
-        object.__setattr__(self, "integer_word_length", iwl)
-        object.__setattr__(self, "offset", as_decimal(self.offset, "offset"))
-        if self.delta is not None:
-            resolved = as_decimal(self.delta, "delta")
-            if resolved <= 0:
-                raise FxpError("delta must be positive")
-            object.__setattr__(self, "delta", resolved)
+        resolved = None if delta is None else as_decimal(delta, "delta")
+        if resolved is not None and resolved <= 0:
+            raise FxpError("delta must be positive")
+        for name, value in (
+            ("word_length", wl),
+            ("integer_word_length", iwl),
+            ("signed", signed),
+            ("delta", resolved),
+            ("offset", as_decimal(offset, "offset")),
+        ):
+            object.__setattr__(self, name, value)
 
     @property
     def resolution(self) -> Decimal:
         """Value of the least significant bit (the quantization step).
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(8, 5).resolution, FxpSpec(8, 8, delta="0.1").resolution
         (Decimal('0.125'), Decimal('0.1'))
         """
@@ -92,6 +100,7 @@ class Layout:
     def min_value(self) -> Decimal:
         """Smallest representable real value.
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(8, 5).min_value, FxpSpec(8, 5, signed=False).min_value
         (Decimal('-16.000'), Decimal('0.000'))
         """
@@ -101,6 +110,7 @@ class Layout:
     def max_value(self) -> Decimal:
         """Largest representable real value.
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(8, 5).max_value
         Decimal('15.875')
         """
@@ -128,6 +138,7 @@ class Layout:
         ``decimal`` mode or one of ``LV_TRUNCATE``, ``LV_ROUND_HALF_UP``,
         ``LV_ROUND_HALF_EVEN`` (the default, as in LabVIEW).
 
+        >>> from lvfxp import FxpSpec
         >>> spec = FxpSpec(8, 5)
         >>> spec.encode("15.875"), spec.encode(-16), spec.encode(16, overflow="wrap")
         (127, 128, 128)
@@ -139,12 +150,13 @@ class Layout:
         coded = fit(round_exact(quotient, rounding), self.word_length, self.signed, mode)
         return coded + (1 << self.word_length) if coded < 0 else coded
 
-    def decode(self, word: int) -> Decimal:
+    def decode(self, word: SupportsIndex) -> Decimal:
         """Return the exact real value of an unsigned ``word_length``-bit word.
 
         A negative ``word`` is accepted as an already-signed code when the layout is
         signed, so decoding round-trips whichever form the caller holds.
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(8, 5).decode(0x80), FxpSpec(8, 5).decode(-128)
         (Decimal('-16.000'), Decimal('-16.000'))
         """
@@ -152,23 +164,33 @@ class Layout:
         number = as_int(word, "word")
         if number < 0:
             if not self.signed or number < self._coded_min:
-                raise FxpError(f"word {short(number)} is out of range for this layout")
+                raise FxpError(f"{describe(number, 'word')} is out of range for this layout")
             number += span
         if number >= span:
-            raise FxpError(f"word {short(number)} does not fit {self.word_length} bits")
+            raise FxpError(f"{describe(number, 'word')} does not fit {self.word_length} bits")
         return self._scale(number - span if self.signed and number > self._coded_max else number)
 
-    def encode_many(self, values: Iterable[Number], **options: Unpack[EncodeOptions]) -> list[int]:
+    def encode_many(
+        self,
+        values: Iterable[Number],
+        *,
+        clamp: bool = False,
+        overflow: str = "raise",
+        rounding: str = LV_ROUND_HALF_EVEN,
+    ) -> list[int]:
         """Encode each value with :meth:`encode` and the same keyword options.
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(8, 5).encode_many([0, "15.875", 99], clamp=True)
         [0, 127, 127]
         """
+        options: EncodeOptions = {"clamp": clamp, "overflow": overflow, "rounding": rounding}
         return [self.encode(value, **options) for value in values]
 
-    def decode_many(self, words: Iterable[int]) -> list[Decimal]:
+    def decode_many(self, words: Iterable[SupportsIndex]) -> list[Decimal]:
         """Decode each word with :meth:`decode`, reusing this layout.
 
+        >>> from lvfxp import FxpSpec
         >>> FxpSpec(4, 3).decode_many([0b0101, 0b1011])
         [Decimal('2.5'), Decimal('-2.5')]
         """

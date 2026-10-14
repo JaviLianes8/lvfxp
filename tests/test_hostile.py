@@ -40,7 +40,7 @@ def test_a_value_is_shown_whole_up_to_the_limit_and_cut_after_it() -> None:
 
 
 def test_huge_integers_are_described_not_printed() -> None:
-    with pytest.raises(FxpError, match="an integer of 65 bits"):
+    with pytest.raises(FxpError, match="a word of 65 bits"):
         from_fxp(2**64, 8, 5)
     with pytest.raises(FxpError, match=str(2**63)):
         from_fxp(2**63, 8, 5)
@@ -106,10 +106,10 @@ class _Index:
 
 
 def test_any_integer_type_is_accepted_and_stored_as_int() -> None:
-    spec = FxpSpec(_Index(8), _Index(5))  # type: ignore[arg-type]
+    spec = FxpSpec(_Index(8), _Index(5))
     assert (type(spec.word_length), type(spec.integer_word_length)) == (int, int)
     assert spec == FxpSpec(8, 5)
-    assert spec.decode(_Index(0x80)) == -16  # type: ignore[arg-type]
+    assert spec.decode(_Index(0x80)) == -16
 
 
 @pytest.mark.parametrize("bad", [8.0, Decimal(8), "8", True, None])
@@ -132,6 +132,6 @@ def test_option_and_overflow_messages_stay_short() -> None:
     with pytest.raises(FxpError) as raised:
         to_fxp(1, 8, 5, overflow="o" * 10_000)
     assert len(str(raised.value)) < 200
-    with pytest.raises(FxpError, match="an integer of 33906 bits") as raised:
+    with pytest.raises(FxpError, match="a code of 33906 bits") as raised:
         to_fxp("1e9000", 8, -4000)
     assert len(str(raised.value)) < 200

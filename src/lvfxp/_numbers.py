@@ -43,6 +43,12 @@ def short(value: object) -> str:
     return text
 
 
+def describe(number: int, noun: str) -> str:
+    """Name an integer in a message: ``code 300``, or ``a code of 136 bits`` when it is wide."""
+    bits = number.bit_length()
+    return f"{noun} {number}" if bits <= 64 else f"a {noun} of {bits} bits"
+
+
 def _parse(value: str | int, name: str) -> Decimal:
     if isinstance(value, int):
         number = int.__index__(value)
