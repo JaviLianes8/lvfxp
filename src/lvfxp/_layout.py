@@ -6,31 +6,34 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Context, Decimal
 from fractions import Fraction
-from typing import SupportsIndex, TypedDict
+from typing import SupportsIndex
 
 from ._errors import FxpError
-from ._numbers import Number, as_decimal, as_fraction, as_int, as_items, describe, digits, short
-from ._quantize import LV_ROUND_HALF_EVEN, check_rounding, fit, overflow_mode, round_exact
+from ._numbers import (
+    Number,
+    as_decimal,
+    as_fraction,
+    as_int,
+    as_items,
+    describe,
+    digits,
+    power_of_two,
+    short,
+)
+from ._quantize import (
+    LV_ROUND_HALF_EVEN,
+    EncodeOptions,
+    check_rounding,
+    fit,
+    overflow_mode,
+    round_exact,
+)
 
 MAX_WORD_LENGTH = 64
 """LabVIEW fixed-point words hold between 1 and 64 bits."""
 
 MAX_INTEGER_WORD_LENGTH = 4096
 """lvfxp's own bound on ``abs(integer_word_length)``, keeping exact values a sane size."""
-
-
-class EncodeOptions(TypedDict, total=False):
-    """Keyword options shared by every encoding method (see :meth:`FxpSpec.encode`).
-
-    >>> from lvfxp import FxpSpec
-    >>> options: EncodeOptions = {"overflow": "saturate"}
-    >>> FxpSpec(8, 5).encode(99, **options)
-    127
-    """
-
-    clamp: bool
-    overflow: str
-    rounding: str
 
 
 @dataclass(frozen=True, init=False)
@@ -71,6 +74,10 @@ class Layout:
             ("offset", as_decimal(offset, "offset")),
         ):
             object.__setattr__(self, name, value)
+        # Derived once: batches over very fine layouts must not redo exact arithmetic per item.
+        step = resolved if resolved is not None else power_of_two(iwl - wl)
+        object.__setattr__(self, "_step", step)
+        object.__setattr__(self, "_fractions", (Fraction(step), Fraction(self.offset)))
 
     @property
     def resolution(self) -> Decimal:
@@ -80,14 +87,8 @@ class Layout:
         >>> FxpSpec(8, 5).resolution, FxpSpec(8, 8, delta="0.1").resolution
         (Decimal('0.125'), Decimal('0.1'))
         """
-        if self.delta is not None:
-            return as_decimal(self.delta)
-        exponent = self.integer_word_length - self.word_length
-        if exponent >= 0:
-            return Decimal(2**exponent)
-        # 2**e == 5**-e * 10**e, exact in a private context and without int-to-str conversion.
-        context = Context(prec=1 - exponent, Emax=999_999, Emin=-999_999)
-        return context.scaleb(Decimal(5**-exponent), Decimal(exponent))
+        step: Decimal = self._step  # type: ignore[attr-defined]
+        return step
 
     @property
     def _coded_min(self) -> int:
@@ -119,7 +120,7 @@ class Layout:
         return self._scale(self._coded_max)
 
     def _scale(self, coded: int) -> Decimal:
-        resolution, offset = self.resolution, as_decimal(self.offset)
+        resolution, offset = self.resolution, self.offset
         # A private context wide enough to be exact, whatever the caller's context says.
         prec = digits(Decimal(coded)) + digits(resolution) + digits(offset) + 10
         context = Context(prec=prec, Emax=999_999, Emin=-999_999)
@@ -147,8 +148,8 @@ class Layout:
         """
         mode = overflow_mode(clamp, overflow)
         check_rounding(rounding)
-        step = Fraction(self.resolution)
-        quotient = (as_fraction(value) - Fraction(as_decimal(self.offset))) / step
+        step, offset = self._fractions  # type: ignore[attr-defined]
+        quotient = (as_fraction(value) - offset) / step
         coded = fit(round_exact(quotient, rounding), self.word_length, self.signed, mode)
         return coded + (1 << self.word_length) if coded < 0 else coded
 

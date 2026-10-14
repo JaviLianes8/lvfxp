@@ -76,3 +76,20 @@ def test_a_descriptor_closed_inside_the_process_does_not_give_exit_120() -> None
         command = [sys.executable, "-c", code.format(fd=fd, args=args)]
         result = subprocess.run(command, capture_output=True, env=_ENV, timeout=60)
         assert result.returncode == expected, (fd, result.returncode)
+
+
+def test_lost_help_output_does_not_stick_to_later_calls() -> None:
+    script = (
+        "import io, sys\n"
+        "from lvfxp._cli import main\n"
+        "closed = io.StringIO(); closed.close(); real = sys.stdout\n"
+        "sys.stdout = closed; first = main(['--help'])\n"
+        "sys.stdout = io.StringIO(); second = main(['--version'])\n"
+        "sys.stdout = real; print(first, second)\n"
+        "print('stderr still works', file=sys.stderr)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, env=_ENV, timeout=60
+    )
+    assert result.stdout.split() == ["1", "0"]
+    assert "stderr still works" in result.stderr

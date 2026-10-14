@@ -13,6 +13,7 @@ from decimal import (
     ROUND_UP,
 )
 from fractions import Fraction
+from typing import TypedDict
 
 from ._errors import FxpError, FxpOverflowError
 from ._numbers import describe, short
@@ -39,6 +40,21 @@ ROUNDING_MODES = frozenset(
         ROUND_UP,
     }
 )
+
+
+class EncodeOptions(TypedDict, total=False):
+    """Keyword options shared by every encoding method (see :meth:`FxpSpec.encode`).
+
+    >>> from lvfxp import FxpSpec
+    >>> options: EncodeOptions = {"overflow": "saturate"}
+    >>> FxpSpec(8, 5).encode(99, **options)
+    127
+    """
+
+    clamp: bool
+    overflow: str
+    rounding: str
+
 
 OVERFLOW_MODES = ("raise", "saturate", "wrap")
 

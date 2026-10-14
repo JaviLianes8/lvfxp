@@ -14,30 +14,30 @@ if TYPE_CHECKING:
 MESSAGE_LIMIT = 300
 
 
-def silence() -> None:
-    """Point stdout and stderr at the null device after a reader went away.
+def silence(stream: object) -> None:
+    """Point ``stream``'s descriptor at the null device after its reader went away.
 
-    Python flushes both streams at exit; on a closed pipe that flush fails and the process
-    exits 120 with a warning. Redirecting the descriptors makes every later write succeed.
+    Python flushes the streams at exit; on a closed pipe that flush fails and the process
+    exits 120 with a warning. Redirecting the descriptor makes every later write succeed.
+    Only the failing stream is touched.
     """
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            fd = stream.fileno()
-        except (AttributeError, OSError, ValueError):
-            continue
-        null = os.open(os.devnull, os.O_WRONLY)
-        if null != fd:  # a closed fd is reused by open(): then it already is the null device
-            os.dup2(null, fd)
-            os.close(null)
+    try:
+        fd = stream.fileno()  # type: ignore[attr-defined]
+    except (AttributeError, OSError, ValueError):
+        return
+    null = os.open(os.devnull, os.O_WRONLY)
+    if null != fd:  # a closed fd is reused by open(): then it already is the null device
+        os.dup2(null, fd)
+        os.close(null)
 
 
 def finish(code: int) -> int:
-    """Flush both streams and return ``code``; a closed pipe silences them instead."""
+    """Flush both streams and return ``code``; a stream whose reader left is silenced."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.flush()
         except (AttributeError, OSError, ValueError):
-            silence()
+            silence(stream)
     return code
 
 
@@ -48,7 +48,7 @@ def write(stream_name: str, text: str) -> bool:
         stream.write(text)
         stream.flush()
     except (AttributeError, OSError, ValueError):
-        silence()
+        silence(stream)
         return False
     return True
 
@@ -61,7 +61,7 @@ class Parser(argparse.ArgumentParser):
             message = message[:MESSAGE_LIMIT] + "..."
         self.exit(2, f"{self.format_usage()}{self.prog}: error: {message}\n")
 
-    lost_output = False  # set when help or version text could not reach its reader
+    lost_output = False  # set on the instance when help or version text could not be written
 
     def exit(self, status: int = 0, message: str | None = None) -> NoReturn:
         if message:
@@ -70,4 +70,4 @@ class Parser(argparse.ArgumentParser):
 
     def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None:
         if message and not write("stderr" if file is sys.stderr else "stdout", message):
-            Parser.lost_output = True
+            self.lost_output = True

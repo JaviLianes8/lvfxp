@@ -9,9 +9,14 @@ from decimal import Decimal
 from . import __version__
 from ._cli_io import MESSAGE_LIMIT, Parser, finish, write
 from ._errors import FxpError
-from ._layout import EncodeOptions
 from ._numbers import as_decimal, short
-from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE, OVERFLOW_MODES
+from ._quantize import (
+    LV_ROUND_HALF_EVEN,
+    LV_ROUND_HALF_UP,
+    LV_TRUNCATE,
+    OVERFLOW_MODES,
+    EncodeOptions,
+)
 from ._spec import FxpSpec
 
 _ROUNDING = {

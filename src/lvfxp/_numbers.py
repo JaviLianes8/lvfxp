@@ -23,7 +23,8 @@ _MAX_BITS = 34_000
 # Error messages never echo more than this many characters of a caller's value.
 _SHOW_LIMIT = 40
 _TYPE_NAME = type.__dict__["__name__"]
-_HUGE_EXPONENT = re.compile(r"\s*[+-]?(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)[eE][+-]?\d[\d_]*\s*")
+# Unambiguous (linear) grammar of a decimal number with an exponent.
+_HUGE_EXPONENT = re.compile(r"\s*[+-]?(\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)[eE][+-]?\d[\d_]*\s*")
 
 
 def type_name(value: object) -> str:
@@ -64,7 +65,10 @@ def _parse(value: str | int, name: str) -> Decimal:
     try:
         return Decimal(str.__str__(value), Context(traps=[InvalidOperation]))
     except InvalidOperation:
-        if _HUGE_EXPONENT.fullmatch(str.__str__(value)):  # beyond what Decimal itself can hold
+        huge = _HUGE_EXPONENT.fullmatch(str.__str__(value))  # beyond what Decimal can hold
+        if huge and not huge.group(1).strip("0._"):
+            return Decimal(0)  # zero stays zero, whatever its exponent
+        if huge:
             raise FxpError(f"{name} needs a decimal exponent beyond +/-{MAX_EXPONENT}") from None
         raise FxpError(f"{name} is not a number: {short(value)}") from None
 
@@ -127,6 +131,15 @@ def as_items(values: Iterable[T], name: str) -> Iterator[T]:
         return iter(values)
     except TypeError:
         raise FxpError(f"{name} must be an iterable, not {type_name(values)}") from None
+
+
+def power_of_two(exponent: int) -> Decimal:
+    """Return ``2 ** exponent`` exactly, without converting a big int to text."""
+    if exponent >= 0:
+        return Decimal(2**exponent)
+    # 2**e == 5**-e * 10**e, exact in a private context wide enough for every digit.
+    context = Context(prec=1 - exponent, Emax=999_999, Emin=-999_999)
+    return context.scaleb(Decimal(5**-exponent), Decimal(exponent))
 
 
 def digits(value: Decimal) -> int:

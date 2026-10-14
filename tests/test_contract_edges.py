@@ -84,3 +84,24 @@ def test_a_wide_word_length_is_described_by_its_size() -> None:
         FxpSpec(2**100, 5)
     with pytest.raises(FxpError, match=r"got 65$"):
         FxpSpec(65, 5)
+
+
+def test_rejected_text_is_rejected_in_linear_time() -> None:
+    for text in ("1" * 100_000 + "x", "1" + "_" * 100_000 + "x", "-" + "1" * 100_000 + "e"):
+        start = time.perf_counter()
+        with pytest.raises(FxpError):
+            to_fxp(text, 8, 5)
+        assert time.perf_counter() - start < 0.5
+
+
+def test_zero_is_zero_whatever_its_exponent() -> None:
+    assert to_fxp("0e" + "9" * 25, 8, 5) == 0
+    assert to_fxp("-0.00e-" + "9" * 25, 8, 5) == 0
+
+
+def test_a_fine_layout_is_prepared_once_for_a_batch() -> None:
+    spec = FxpSpec(64, -4096)
+    start = time.perf_counter()
+    values = spec.decode_many(range(2000))
+    assert spec.encode_many(values) == list(range(2000))
+    assert time.perf_counter() - start < 2

@@ -40,7 +40,8 @@ Decimal('31.875')
 
 Values may be `int`, `float`, `Decimal` or `str`. A float is read through its shortest
 repr, so `0.1` means `Decimal("0.1")`, not the binary double's long expansion. Text is read
-as `decimal.Decimal` reads it (surrounding spaces and digit underscores included). NaN,
+as `decimal.Decimal` reads it: surrounding spaces, digit underscores and non-ASCII decimal
+digits (`"\u0661\u0662"` is 12) are accepted, and zero is zero whatever its exponent. NaN,
 infinities, booleans, other types and decimal exponents beyond +/-10000 raise `FxpError`.
 Decoding returns an exact `Decimal`; the `decimal` context of the caller plays no part.
 

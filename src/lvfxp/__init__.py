@@ -28,8 +28,8 @@ from ._codec import (
 )
 from ._errors import FxpError, FxpOverflowError
 from ._flat import FLATTENED_SIZE
-from ._layout import MAX_INTEGER_WORD_LENGTH, MAX_WORD_LENGTH, EncodeOptions
-from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE
+from ._layout import MAX_INTEGER_WORD_LENGTH, MAX_WORD_LENGTH
+from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE, EncodeOptions
 from ._spec import FxpSpec
 
 __version__ = "1.0.0"
