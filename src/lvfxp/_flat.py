@@ -9,8 +9,10 @@ LabVIEW stores 72 bits; where that status byte sits is not documented, so it is 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from ._errors import FxpError
+from ._numbers import Bytes, type_name
 
 FLATTENED_SIZE = 8
 """Bytes in a flattened LabVIEW fixed-point value (without an overflow status)."""
@@ -19,9 +21,18 @@ _COUNT_SIZE = 4
 _MAX_COUNT = (1 << 31) - 1
 
 
-def _check_bytes(data: object) -> None:
-    if not isinstance(data, (bytes, bytearray, memoryview)):
-        raise FxpError(f"expected bytes, not {type(data).__name__}")
+def as_bytes(data: object) -> bytes:
+    """Return the raw bytes of a bytes-like ``data`` (any memoryview format, flattened)."""
+    if not issubclass(type(data), (bytes, bytearray, memoryview)):  # never trust __class__
+        raise FxpError(f"expected bytes, not {type_name(data)}")
+    try:
+        if issubclass(type(data), bytes):  # the stored bytes, whatever a subclass's buffer says
+            return bytes.__getitem__(cast(bytes, data), slice(None))
+        if issubclass(type(data), bytearray):
+            return bytes(bytearray.copy(cast(bytearray, data)))
+        return memoryview(cast(memoryview, data)).tobytes()
+    except ValueError:
+        raise FxpError("expected bytes, got a released memoryview") from None
 
 
 def _coded(word: int, word_length: int, signed: bool) -> int:
@@ -49,13 +60,13 @@ def _size_error(got: int) -> FxpError:
     return FxpError(message)
 
 
-def unflatten_word(data: bytes | bytearray, word_length: int, signed: bool) -> int:
+def unflatten_word(data: Bytes, word_length: int, signed: bool) -> int:
     """Return the unsigned word held in 8 flattened bytes.
 
     The bits above the word must be its sign extension (zeros when unsigned), as LabVIEW
     writes them; anything else means the bytes belong to another layout.
     """
-    _check_bytes(data)
+    data = as_bytes(data)
     if len(data) != FLATTENED_SIZE:
         raise _size_error(len(data))
     raw = int.from_bytes(data, "big", signed=signed)
@@ -64,7 +75,7 @@ def unflatten_word(data: bytes | bytearray, word_length: int, signed: bool) -> i
     if not low <= raw <= high:
         sign = "signed" if signed else "unsigned"
         raise FxpError(
-            f"bytes {bytes(data).hex()} are not a {sign} {word_length}-bit word extended to"
+            f"bytes {data.hex()} are not a {sign} {word_length}-bit word extended to"
             f" 64 bits; check the word length and signedness"
         )
     return raw & ((1 << word_length) - 1)
@@ -75,12 +86,13 @@ def compact_word(word: int, word_length: int) -> bytes:
     return word.to_bytes(compact_size(word_length), "big")
 
 
-def uncompact_word(data: bytes | bytearray, word_length: int) -> int:
+def uncompact_word(data: Bytes, word_length: int) -> int:
     """Read a compact word, ignoring any bits above ``word_length``."""
-    _check_bytes(data)
+    data = as_bytes(data)
     size = compact_size(word_length)
     if len(data) != size:
-        raise FxpError(f"expected {size} compact bytes, got {len(data)}")
+        unit = "byte" if size == 1 else "bytes"
+        raise FxpError(f"the compact form of this layout is {size} {unit}, got {len(data)}")
     return int.from_bytes(data, "big") & ((1 << word_length) - 1)
 
 
@@ -92,17 +104,18 @@ def flatten_array(words: Iterable[int], word_length: int, signed: bool) -> bytes
     return len(items).to_bytes(_COUNT_SIZE, "big") + b"".join(items)
 
 
-def unflatten_array(data: bytes | bytearray, word_length: int, signed: bool) -> list[int]:
+def unflatten_array(data: Bytes, word_length: int, signed: bool) -> list[int]:
     """Read a flattened 1-D array back into unsigned words; the length must match exactly."""
-    _check_bytes(data)
+    data = as_bytes(data)
     if len(data) < _COUNT_SIZE:
         raise FxpError(f"a flattened array starts with a {_COUNT_SIZE}-byte count")
     count = int.from_bytes(data[:_COUNT_SIZE], "big", signed=True)
     body = data[_COUNT_SIZE:]
-    if count < 0 or len(body) != count * FLATTENED_SIZE:
+    if count < 0:
+        raise FxpError(f"array count must not be negative, got {count}")
+    if len(body) != count * FLATTENED_SIZE:
         raise FxpError(
-            f"array count {count} needs {max(count, 0) * FLATTENED_SIZE} element bytes,"
-            f" got {len(body)}"
+            f"array count {count} needs {count * FLATTENED_SIZE} element bytes, got {len(body)}"
         )
     return [
         unflatten_word(body[start : start + FLATTENED_SIZE], word_length, signed)

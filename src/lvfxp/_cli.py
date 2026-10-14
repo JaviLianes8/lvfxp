@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from decimal import Decimal
 
 from . import __version__
+from ._cli_io import MESSAGE_LIMIT, Parser, finish, write
 from ._errors import FxpError
-from ._numbers import as_decimal
-from ._quantize import LV_ROUND_HALF_EVEN, LV_ROUND_HALF_UP, LV_TRUNCATE, OVERFLOW_MODES
-from ._spec import EncodeOptions, FxpSpec
+from ._numbers import as_decimal, short
+from ._quantize import (
+    LV_ROUND_HALF_EVEN,
+    LV_ROUND_HALF_UP,
+    LV_TRUNCATE,
+    OVERFLOW_MODES,
+    EncodeOptions,
+)
+from ._spec import FxpSpec
 
 _ROUNDING = {
     "half-even": LV_ROUND_HALF_EVEN,
@@ -61,7 +67,7 @@ def _plain(value: Decimal) -> str:
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return "0" if text in ("-0", "") else text
+    return text
 
 
 def _parse_hex(text: str) -> bytes:
@@ -69,11 +75,11 @@ def _parse_hex(text: str) -> bytes:
     try:
         return bytes.fromhex(cleaned)
     except ValueError:
-        raise FxpError(f"not valid hex: {text!r}") from None
+        raise FxpError(f"not valid hex: {short(text)}") from None
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def _build_parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser]]:
+    parser = Parser(
         prog="lvfxp",
         description="Encode and decode LabVIEW fixed-point (FXP) numbers exactly.",
         epilog=_EXAMPLES,
@@ -104,7 +110,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     info = subparsers.add_parser("info", help="show a layout's resolution, range and sizes")
     _add_spec(info)
-    return parser
+    return parser, {"encode": encode, "decode": decode, "info": info}
 
 
 def _run_encode(args: argparse.Namespace) -> str:
@@ -124,11 +130,7 @@ def _run_encode(args: argparse.Namespace) -> str:
 def _run_decode(args: argparse.Namespace) -> str:
     spec = _spec(args)
     if args.word is not None:
-        if args.hex is not None:
-            raise FxpError("give either hex bytes or --word, not both")
         return _plain(spec.decode(args.word))
-    if args.hex is None:
-        raise FxpError("give the flattened bytes as hex, or use --word")
     data = _parse_hex(args.hex)
     return _plain(spec.unpack_compact(data) if args.compact else spec.unpack(data))
 
@@ -157,16 +159,35 @@ def _run_info(args: argparse.Namespace) -> str:
 _COMMANDS = {"encode": _run_encode, "decode": _run_decode, "info": _run_info}
 
 
+def _usage_problem(args: argparse.Namespace) -> str | None:
+    if args.command == "decode" and (args.word is None) == (args.hex is None):
+        if args.word is None:
+            return "give the flattened bytes as hex, or use --word"
+        return "give either hex bytes or --word, not both"
+    if args.command == "encode" and args.clamp and args.overflow == "wrap":
+        return "--clamp saturates; it cannot be combined with --overflow wrap"
+    return None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point for the ``lvfxp`` console command."""
-    args = _build_parser().parse_args(argv)
+    """Entry point for the ``lvfxp`` console command.
+
+    Exit codes: 0 done, 1 bad data (or the reader of the output went away), 2 bad usage.
+    """
+    parser, subcommands = _build_parser()
+    try:
+        args = parser.parse_args(argv)
+        problem = _usage_problem(args)
+        if problem is not None:
+            subcommands[args.command].error(problem)
+    except SystemExit as stop:
+        return stop.code if isinstance(stop.code, int) else 2
     try:
         output = _COMMANDS[args.command](args)
     except (FxpError, ValueError, ArithmeticError) as exc:
-        print(f"lvfxp: {exc}", file=sys.stderr)
-        return 1
-    print(output)
-    return 0
+        write("stderr", f"lvfxp: {str(exc)[:MESSAGE_LIMIT]}\n")
+        return finish(1)
+    return finish(0 if write("stdout", output + "\n") else 1)
 
 
 if __name__ == "__main__":

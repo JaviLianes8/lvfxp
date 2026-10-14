@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import venv
+import zipfile
 from decimal import Decimal
 from pathlib import Path
 
@@ -25,14 +26,26 @@ _ENV = {key: value for key, value in os.environ.items() if key.upper() not in _L
 _CAPTURE = _ROOT / "tests" / "fixtures" / "labview2026" / "datalog_fixed_point_cast_i8_m27.dat"
 
 
-@pytest.fixture(scope="module")
-def script(tmp_path_factory: pytest.TempPathFactory) -> str:
+def _wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    given = os.environ.get("LVFXP_WHEEL")
+    if given:
+        return Path(given)
+    if not (_ROOT / "src" / "lvfxp" / "__init__.py").is_file():
+        pytest.skip("no source tree to build from; set LVFXP_WHEEL to a built wheel")
     wheels = tmp_path_factory.mktemp("wheels")
     build = [sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps"]
     if importlib.util.find_spec("hatchling") is not None:
         build.append("--no-build-isolation")
     subprocess.run([*build, "-w", str(wheels), str(_ROOT)], check=True, timeout=600, env=_ENV)
     (wheel,) = wheels.glob("lvfxp-*.whl")
+    return wheel
+
+
+@pytest.fixture(scope="module")
+def script(tmp_path_factory: pytest.TempPathFactory) -> str:
+    wheel = _wheel(tmp_path_factory)
+    with zipfile.ZipFile(wheel) as archive:
+        assert "lvfxp/__init__.py" in archive.namelist(), "the wheel holds no package"
     env_dir = tmp_path_factory.mktemp("venv")
     venv.EnvBuilder(with_pip=True).create(env_dir)
     scripts = env_dir / ("Scripts" if os.name == "nt" else "bin")

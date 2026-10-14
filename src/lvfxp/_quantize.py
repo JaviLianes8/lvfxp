@@ -13,8 +13,10 @@ from decimal import (
     ROUND_UP,
 )
 from fractions import Fraction
+from typing import TypedDict
 
 from ._errors import FxpError, FxpOverflowError
+from ._numbers import describe, short
 
 LV_TRUNCATE = ROUND_FLOOR
 """LabVIEW Truncate: drop the extra low bits, which in two's complement rounds down."""
@@ -39,32 +41,60 @@ ROUNDING_MODES = frozenset(
     }
 )
 
+
+class EncodeOptions(TypedDict, total=False):
+    """Keyword options shared by every encoding method (see :meth:`FxpSpec.encode`).
+
+    >>> from lvfxp import FxpSpec
+    >>> options: EncodeOptions = {"overflow": "saturate"}
+    >>> FxpSpec(8, 5).encode(99, **options)
+    127
+    """
+
+    clamp: bool
+    overflow: str
+    rounding: str
+
+
 OVERFLOW_MODES = ("raise", "saturate", "wrap")
 
 _HALF = Fraction(1, 2)
 
 
-def check_rounding(rounding: str) -> None:
-    if not isinstance(rounding, str) or rounding not in ROUNDING_MODES:
-        raise FxpError(f"unknown rounding mode {rounding!r}")
+def check_rounding(rounding: str) -> str:
+    """Return the rounding name as a plain str; a str subclass cannot change what it says."""
+    plain = str.__str__(rounding) if issubclass(type(rounding), str) else None
+    if plain not in ROUNDING_MODES:
+        raise FxpError(f"unknown rounding mode {short(rounding)}")
+    return plain
 
 
 def overflow_mode(clamp: bool, overflow: str) -> str:
-    """Resolve the legacy ``clamp`` flag and the ``overflow`` name into one mode."""
-    if not isinstance(clamp, bool):
+    """Resolve the ``clamp`` shorthand and the ``overflow`` name into one mode."""
+    if type(clamp) is not bool:
         raise FxpError("clamp must be a bool")
-    if not isinstance(overflow, str) or overflow not in OVERFLOW_MODES:
-        raise FxpError(f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {overflow!r}")
+    plain = str.__str__(overflow) if issubclass(type(overflow), str) else None
+    if plain not in OVERFLOW_MODES:
+        raise FxpError(
+            f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {short(overflow)}"
+        )
     if clamp:
-        if overflow == "wrap":
+        if plain == "wrap":
             raise FxpError("clamp=True saturates; it cannot be combined with overflow='wrap'")
         return "saturate"
-    return overflow
+    return plain
+
+
+def check_options(clamp: bool, overflow: str, rounding: str) -> str:
+    """Check every encode option and return the overflow mode they select."""
+    mode = overflow_mode(clamp, overflow)
+    check_rounding(rounding)
+    return mode
 
 
 def round_exact(quotient: Fraction, rounding: str) -> int:
     """Round an exact rational to an integer with a ``decimal`` or LabVIEW mode."""
-    check_rounding(rounding)
+    rounding = check_rounding(rounding)
     floor = quotient.numerator // quotient.denominator
     rest = quotient - floor
     if rest == 0:
@@ -103,4 +133,4 @@ def fit(coded: int, word_length: int, signed: bool, mode: str) -> int:
     if mode == "wrap":
         word = coded & ((1 << word_length) - 1)
         return word - (1 << word_length) if signed and word > high else word
-    raise FxpOverflowError(f"value needs code {coded}, outside [{low}, {high}]")
+    raise FxpOverflowError(f"value needs {describe(coded, 'code')}, outside [{low}, {high}]")

@@ -1,0 +1,11 @@
+{
+ "labview": "LabVIEW 2026 Community 26.3.1f1 (Windows x64)",
+ "method": "the shipped example examples/Numerics/Fixed-Point Cast.vi run headless through LabVIEW's ActiveX server with front-panel logging at completion; files copied unchanged",
+ "files": {
+  "datalog_fixed_point_cast_i8_m27.dat": {"captured": "2026-10-12", "how": "one run, I8 2 = -27", "size": 520, "sha256": "779c007ef3d2ebca4340a4504143f042f3032d7ea517f391cd4827da08892d21"},
+  "datalog_fixed_point_cast_i8_p100.dat": {"captured": "2026-10-12", "how": "one run, I8 2 = 100", "size": 520, "sha256": "eb2d36a6817d4e0e7eae70d718dc7f4cfab9ee31bfb73dd57e6e561e8d5e1fab"},
+  "datalog_fixed_point_cast_i8_m128.dat": {"captured": "2026-10-12", "how": "one run, I8 2 = -128", "size": 520, "sha256": "a782efdde4b511fa3c0f782e8592a6378ffad175f07fe6180ecac935f3237ee7"},
+  "datalog_fixed_point_cast_i8_p31.dat": {"captured": "2026-10-12", "how": "one run, I8 2 = 31", "size": 520, "sha256": "c94971d7244b6edbbf60c87481b48e011ae66bc6e749e1625f8946d14496b22e"},
+  "datalog_fixed_point_cast_i8_sweep.dat": {"captured": "2026-10-14", "how": "256 runs logged to one file, I8 2 = -128, -127, ..., 127 in that order; each record is a 6-byte record header and the 44-byte front panel", "size": 13270, "sha256": "f7d1917e806cb4a54d7c8e3be20907877faa7a3171652d818c51d5093ab1e098"}
+ }
+}

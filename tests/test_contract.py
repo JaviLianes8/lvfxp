@@ -72,7 +72,7 @@ def test_all_lists_exactly_the_public_api() -> None:
 
 
 def test_version_and_type_information_ship() -> None:
-    assert lvfxp.__version__ == "0.3.0"
+    assert lvfxp.__version__ == "1.0.0"
     assert importlib.resources.files("lvfxp").joinpath("py.typed").is_file()
 
 

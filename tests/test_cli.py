@@ -69,9 +69,6 @@ def test_hex_accepts_prefix_spaces_and_underscores(capsys: pytest.CaptureFixture
         (["decode", "80", "--wl", "8", "--iwl", "5"], "8 bytes, got 1"),
         (["decode", "00" * 9, "--wl", "8", "--iwl", "5"], "overflow status"),
         (["decode", "00000000000000ff", "--wl", "8", "--iwl", "5"], "extended"),
-        (["decode", "--wl", "8", "--iwl", "5"], "use --word"),
-        (["decode", "7f", "--word", "1", "--wl", "8", "--iwl", "5"], "not both"),
-        (["encode", "1", "--wl", "8", "--iwl", "5", "--clamp", "--overflow", "wrap"], "wrap"),
     ],
 )
 def test_data_errors_go_to_stderr_with_exit_one(
@@ -83,11 +80,23 @@ def test_data_errors_go_to_stderr_with_exit_one(
     assert message in err
 
 
-def test_usage_errors_exit_two(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as raised:
-        main(["encode", "1", "--wl", "8", "--iwl", "5", "--word", "--compact"])
-    assert raised.value.code == 2
-    assert "not allowed with" in capsys.readouterr().err
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["encode", "1", "--wl", "8", "--iwl", "5", "--word", "--compact"], "not allowed with"),
+        (["decode", "--wl", "8", "--iwl", "5"], "use --word"),
+        (["decode", "7f", "--word", "1", "--wl", "8", "--iwl", "5"], "not both"),
+        (["encode", "1", "--wl", "8", "--iwl", "5", "--clamp", "--overflow", "wrap"], "wrap"),
+        (["encode", "1", "--wl", "9" * 30_000, "--iwl", "5"], "invalid int value"),
+    ],
+)
+def test_usage_errors_exit_two_with_a_short_message(
+    capsys: pytest.CaptureFixture[str], args: list[str], message: str
+) -> None:
+    assert main(args) == 2
+    err = capsys.readouterr().err
+    assert message in err
+    assert len(err) < 1000
 
 
 def test_info_names_an_explicit_delta_and_offset(capsys: pytest.CaptureFixture[str]) -> None:
@@ -111,5 +120,5 @@ def test_double_dash_passes_a_negative_exponent_value(capsys: pytest.CaptureFixt
 
 
 def test_out_of_bound_input_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
-    assert _run(capsys, "info", "--wl", "8", "--iwl", "-100000000")[0] == 1
+    assert _run(capsys, "info", "--wl", "8", "--iwl", "-4097")[0] == 1
     assert _run(capsys, "encode", "1e999999999", "--wl", "8", "--iwl", "5")[0] == 1

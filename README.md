@@ -1,7 +1,11 @@
 # lvfxp
 
 Encode and decode LabVIEW fixed-point (FXP) numbers and their flattened bytes, exactly, in
-pure Python.
+pure Python, with no dependencies. Python 3.10 or newer.
+
+The full reference is the [guide](https://github.com/JaviLianes8/lvfxp/blob/main/GUIDE.md);
+every release is described in the
+[changelog](https://github.com/JaviLianes8/lvfxp/blob/main/CHANGELOG.md).
 
 ## Install
 
@@ -44,7 +48,7 @@ Decoding returns a `Decimal` that is exact at every width, including the `2 ** -
 resolution of a `<64, 0>` word. Floats are read through their shortest repr, so `0.1`
 means `Decimal("0.1")`. Bad input (text that is not a number, NaN, infinity, a decimal exponent
 beyond +/-10000, a word that does not fit, data that is not bytes) raises `FxpError`, a
-`ValueError`.
+`ValueError`. Results never depend on the caller's `decimal` context.
 
 ## Rounding and overflow
 
@@ -99,16 +103,23 @@ different word length or signedness raise instead of decoding to a wrong value.
 
 ### What is verified, and what is not
 
-- **Value math: verified.** Word length, integer word length, signedness, the scaling
-  `2 ** (iwl - wl)`, rounding and overflow follow NI's documentation, and a contract test
+- **Value math: derived and checked.** Word length, integer word length (the number of
+  integer bits), signedness and the names of the rounding and overflow modes follow NI's
+  documentation; the scaling `2 ** (iwl - wl)` follows from the number of integer bits and
+  is not captured from LabVIEW. A contract test
   checks every word of each word length up to 8 bits, at several integer word lengths,
   against independent rational arithmetic.
+- **Tie and truncate directions: derived.** NI says Round-Half-Up adds to the least
+  significant bit and Truncate removes bits; that ties go toward positive infinity and
+  Truncate rounds toward negative infinity follows from two's-complement arithmetic. It is
+  not stated by NI and was not captured.
 - **8-byte layout: verified.** NI documents the 64-bit, sign-extended format and
   big-endian flattening, and its numeric table gives fixed-point 64 bits of storage on
-  disk. A real LabVIEW 2026 capture agrees byte for byte: front-panel datalog records
+  disk. Real LabVIEW 2026 captures agree byte for byte: front-panel datalog records
   written by the shipped `Fixed-Point Cast.vi` example store each fixed-point value as 8
   big-endian bytes, signed words sign extended and an unsigned `<+, 10, 4>` word with its
-  top bit set zero extended (`tests/fixtures/labview2026`). The output of the Flatten To
+  top bit set zero extended; one capture holds the example's Integer to Fixed-Point Cast
+  of every I8 value, 768 flattened words (`tests/fixtures/labview2026`). The output of the Flatten To
   String function itself was not captured; NI Community reports of 8-byte flattened
   fixed-point strings (see Sources) match the same form.
 - **1-D arrays: derived, not captured.** `pack_array`/`unpack_array` combine NI's
@@ -126,7 +137,7 @@ or links; LabVIEW does not read or write it. Unpacking it ignores bits above the
 
 ## Command line
 
-Installing the package adds an `lvfxp` command.
+Installing the package adds an `lvfxp` command (`python -m lvfxp` works too).
 
 ```
 $ lvfxp encode 15.875 --wl 8 --iwl 5
@@ -154,7 +165,8 @@ compact bytes: 1
 prints the exact value in plain notation. Every command takes `--wl`, `--iwl`,
 `--unsigned`, `--delta` and `--offset`; `lvfxp --help` lists runnable examples. Data errors
 print to stderr with exit code 1; usage errors exit 2. Put `--` before a negative value
-in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0`.
+in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0` (needed before Python
+3.14).
 
 ## Why
 
@@ -163,8 +175,8 @@ type-descriptor machinery (there is no separate OpenG FXP package); that machine
 inside LabVIEW only. LabVIEW exchanges fixed-point data through TDMS files, flattened
 strings and network streams, but the Python tools that read those sources do not decode
 the FXP type: [autolv](https://pypi.org/project/autolv/) states fixed-point is not
-supported, and [npTDMS](https://pypi.org/project/npTDMS/) lists it among its unsupported
-types. General fixed-point maths packages such as `fxpmath` and `fixedpoint` implement
+supported, and [npTDMS](https://pypi.org/project/npTDMS/) has no fixed-point entry in
+[its table of TDMS data types](https://github.com/adamreeve/npTDMS/blob/master/nptdms/types.py). General fixed-point maths packages such as `fxpmath` and `fixedpoint` implement
 their own arithmetic, not LabVIEW's wire layout. `struct` and `numpy` have no type for an
 arbitrary word length with a shifting or negative integer word length. `lvfxp` fills that
 gap with a small, zero-dependency, exact codec.
@@ -177,9 +189,11 @@ gap with a small, zero-dependency, exact codec.
   flattened numeric data is big-endian; arrays start with 32-bit dimension sizes.
 - NI, [Numeric Data Types Table](https://www.ni.com/docs/en-US/bundle/labview/page/numeric-data-types-table.html):
   fixed-point takes 64 bits of storage on disk, or 72 with an overflow status.
-- NI, [Fixed-Point Numbers (LabVIEW 2018 Help)](https://zone.ni.com/reference/en-XX/help/371361R-01/lvhowto/fixed_point_numbers/):
+- NI, [Configuring Fixed-Point Numbers](https://www.ni.com/docs/en-US/bundle/labview/page/configuring-fixed-point-numbers.html):
+  the integer word length is the number of integer bits used for the value.
+- NI, [Fixed-Point Numbers](https://www.ni.com/docs/en-US/bundle/labview/page/fixed-point-numbers.html):
   word length between 1 and 64 bits, signed or unsigned.
-- NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/lvfpgaconcepts/fpgafixedpoint.html):
+- NI, [LabVIEW FPGA fixed-point data type](https://www.ni.com/docs/en-US/bundle/labview-fpga-module/page/using-the-fixed-point-data-type-fpga-module.html):
   Truncate, Round-Half-Up (asymmetric) and Round-Half-Even (the fixed-point default);
   Saturate and Wrap.
 - NI, [To Fixed-Point](https://www.ni.com/docs/en-US/bundle/labview-api-ref/page/functions/to-fixed-point.html):
@@ -190,7 +204,7 @@ gap with a small, zero-dependency, exact codec.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/lvfxp/blob/main/LICENSE).
 
 ## Links
 
