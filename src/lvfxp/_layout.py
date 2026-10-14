@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Context, Decimal
@@ -33,6 +34,13 @@ MAX_WORD_LENGTH = 64
 
 MAX_INTEGER_WORD_LENGTH = 4096
 """lvfxp's own bound on ``abs(integer_word_length)``, keeping exact values a sane size."""
+
+
+@functools.lru_cache(maxsize=256)
+def _derive(exponent: int, delta: str | None, offset: str) -> tuple[Decimal, Fraction, Fraction]:
+    """Resolution and exact fractions of a layout; text keys keep each Decimal's spelling."""
+    step = power_of_two(exponent) if delta is None else Decimal(delta)
+    return step, Fraction(step), Fraction(Decimal(offset))
 
 
 _FIELDS = ("word_length", "integer_word_length", "signed", "delta", "offset")
@@ -79,10 +87,7 @@ class Layout:
         offset = as_decimal(self.offset, "offset")
         for name, value in zip(_FIELDS, (wl, iwl, self.signed, delta, offset), strict=True):
             object.__setattr__(self, name, value)
-        # Derived once: batches over very fine layouts must not redo exact arithmetic per item.
-        step = delta if delta is not None else power_of_two(iwl - wl)
-        object.__setattr__(self, "_step", step)
-        object.__setattr__(self, "_fractions", (Fraction(step), Fraction(offset)))
+        self._derived()  # prepared now, so every later call finds it ready
 
     @property
     def resolution(self) -> Decimal:
@@ -92,8 +97,7 @@ class Layout:
         >>> FxpSpec(8, 5).resolution, FxpSpec(8, 8, delta="0.1").resolution
         (Decimal('0.125'), Decimal('0.1'))
         """
-        step: Decimal = self._step  # type: ignore[attr-defined]
-        return step
+        return self._derived()[0]
 
     @property
     def _coded_min(self) -> int:
@@ -103,6 +107,11 @@ class Layout:
     def _coded_max(self) -> int:
         bits = self.word_length - 1 if self.signed else self.word_length
         return (1 << bits) - 1
+
+    def _derived(self) -> tuple[Decimal, Fraction, Fraction]:
+        # Kept out of the instance, so copies, pickles and subclasses carry the fields only.
+        delta = None if self.delta is None else str(self.delta)
+        return _derive(self.integer_word_length - self.word_length, delta, str(self.offset))
 
     def _scale(self, coded: int) -> Decimal:
         resolution, offset = self.resolution, self.offset
@@ -132,7 +141,7 @@ class Layout:
         (127, 128, 128)
         """
         mode = check_options(clamp, overflow, rounding)
-        step, offset = self._fractions  # type: ignore[attr-defined]
+        _, step, offset = self._derived()
         quotient = (as_fraction(value) - offset) / step
         coded = fit(round_exact(quotient, rounding), self.word_length, self.signed, mode)
         return coded + (1 << self.word_length) if coded < 0 else coded

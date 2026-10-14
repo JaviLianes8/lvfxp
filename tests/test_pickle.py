@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import pickle
 from decimal import Decimal
@@ -90,3 +91,51 @@ def test_a_subclass_with_its_own_init_round_trips() -> None:
     spec = _Fixed8(5)
     loaded = pickle.loads(pickle.dumps(spec))
     assert (type(loaded), loaded, loaded.max_value) == (_Fixed8, spec, Decimal("15.875"))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Slotted(FxpSpec):
+    extra: str = "e"
+
+
+@dataclasses.dataclass(frozen=True)
+class _OwnPostInit(FxpSpec):
+    unit: str = "V"
+
+    def __post_init__(self) -> None:  # does not call super(), as some 0.3.0 users wrote
+        pass
+
+
+class _Labelled(FxpSpec):
+    def __init__(self, word_length: int, integer_word_length: int, label: str) -> None:
+        super().__init__(word_length, integer_word_length)
+        object.__setattr__(self, "label", label)
+
+
+@pytest.mark.parametrize(
+    "clone", [copy.copy, copy.deepcopy, lambda s: pickle.loads(pickle.dumps(s))]
+)
+def test_subclasses_copy_and_pickle_whole(clone: object) -> None:
+    for spec in (_Slotted(8, 5, extra="x"), _Labelled(8, 5, "lab"), _OwnPostInit(8, 5)):
+        twin = clone(spec)  # type: ignore[operator]
+        assert (type(twin), twin, vars(twin)) == (type(spec), spec, vars(spec))
+        assert (twin.resolution, twin.encode("15.875")) == (Decimal("0.125"), 127)
+
+
+def test_a_subclass_that_skips_the_parent_post_init_still_computes() -> None:
+    spec = _OwnPostInit(8, 5)
+    assert (spec.resolution, spec.decode(0x80), spec.max_value) == (
+        Decimal("0.125"),
+        Decimal("-16.000"),
+        Decimal("15.875"),
+    )
+
+
+def test_no_derived_state_is_stored_on_the_instance() -> None:
+    assert set(vars(FxpSpec(8, 5))) == {
+        "word_length",
+        "integer_word_length",
+        "signed",
+        "delta",
+        "offset",
+    }

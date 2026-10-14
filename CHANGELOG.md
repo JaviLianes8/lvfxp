@@ -67,9 +67,13 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
 - The project URL `Repository` is now `Source`. The sdist lists its contents explicitly: it
   adds GUIDE.md and leaves out the scripts, the process notes, `.github` and
   `.gitattributes` (`.gitignore` stays, as the build backend always adds it).
-- Specs pickle as their dataclass fields, a subclass's included (and pickles written by 0.3.0
-  still load); unbound methods of `FxpSpec` pickle again. Validation runs in
-  `__post_init__`, so a dataclass subclass of `FxpSpec` is validated as in 0.3.0.
+- Specs hold only their five fields, so copies and pickles (a subclass's too) work as in
+  0.3.0 and pickles cross between 0.3.0 and 1.0.0 both ways; unbound methods of `FxpSpec`
+  pickle again. Validation stays in `__post_init__`, as in 0.3.0.
+- `delta` and `offset` are typed `Decimal | None` and `Decimal` as fields, so
+  `dataclasses.replace(spec, delta="0.1")` and the generated constructor of a dataclass
+  subclass type-check only with `Decimal` (and `int` for the lengths); at run time they still
+  accept any number, as before.
 - Usage errors print the usage line of the subcommand that was used.
 
 ### Added

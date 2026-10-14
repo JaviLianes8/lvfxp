@@ -205,8 +205,10 @@ Calls give the same result as in 0.3.0 except in these cases:
 - A float subclass such as `numpy.float64` is read through its shortest repr; 0.3.0 raised
   `decimal.InvalidOperation` for `numpy.float64(1.5)`. `numpy.float32` is not a `float` and
   still needs `float()`.
-- A `FxpSpec` pickled by 0.3.0 loads and works; 1.0.0 pickles hold only the dataclass
-  fields. Subclasses (dataclass or not) are validated and pickle with their own fields.
+- Pickles cross between 0.3.0 and 1.0.0 in both directions; copies and pickles of subclasses
+  keep everything the subclass stores.
+- `dataclasses.replace` and a dataclass subclass's constructor are typed by the field types
+  (`int`, `Decimal`); a type checker flags `replace(spec, delta="0.1")` although it runs.
 - Integer arguments of an `int` subclass (an `IntEnum`, say) are stored as plain `int`, so a
   spec's `repr` shows `word_length=8`.
 - Very fine resolutions such as `FxpSpec(64, -4096).resolution` no longer depend on

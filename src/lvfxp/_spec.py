@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import copyreg
-import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -31,17 +29,6 @@ class FxpSpec(Layout):
     >>> FxpSpec(8, 8, signed=False, delta="0.1", offset=1).decode(5)
     Decimal('1.5')
     """
-
-    def __reduce__(self) -> tuple[object, ...]:
-        # Every dataclass field (a subclass's too) and nothing derived; no __init__ on load.
-        state = {field.name: getattr(self, field.name) for field in dataclasses.fields(self)}
-        return copyreg.__newobj__, (type(self),), state  # type: ignore[attr-defined]
-
-    def __setstate__(self, state: dict[str, object]) -> None:
-        # Also reads pickles written by 0.3.0, whose state is the same five fields.
-        for name, value in state.items():
-            object.__setattr__(self, name, value)
-        self.__post_init__()
 
     @property
     def min_value(self) -> Decimal:
