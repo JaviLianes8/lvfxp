@@ -199,6 +199,10 @@ Every 0.3.0 call keeps its result. The differences are at the edges:
 - NumPy integers and other `__index__` types are now accepted where an `int` is expected.
 - A `memoryview` whose items are wider than a byte is now read as its raw bytes; 0.3.0
   counted its items and refused or misread it.
-- Error message texts changed: long values are cut, wide integers described. Code that
-  matched on a whole message may need updating; the exception types are unchanged.
+- Error message texts changed (long values are cut, wide integers described, some messages
+  name the value they refuse). Code that matched on a whole message may need updating; the
+  exception types are unchanged, except where 0.3.0 leaked a plain `ValueError` or
+  `TypeError` (see the changelog).
+- `lvfxp decode` without hex or `--word`, or with both, and `--clamp --overflow wrap` now exit
+  2 (usage) instead of 1.
 - The caller's `decimal` context no longer changes results.
