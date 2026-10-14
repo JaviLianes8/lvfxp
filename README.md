@@ -164,7 +164,8 @@ compact bytes: 1
 prints the exact value in plain notation. Every command takes `--wl`, `--iwl`,
 `--unsigned`, `--delta` and `--offset`; `lvfxp --help` lists runnable examples. Data errors
 print to stderr with exit code 1; usage errors exit 2. Put `--` before a negative value
-in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0`.
+in scientific notation, as in `lvfxp encode --wl 8 --iwl 5 -- -1e0` (needed before Python
+3.14).
 
 ## Why
 

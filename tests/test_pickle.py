@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import pickle
 from decimal import Decimal
 
@@ -63,3 +64,29 @@ def test_methods_of_the_public_class_pickle_and_name_it() -> None:
 def test_usage_errors_show_the_subcommand_usage(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["decode", "--wl", "8", "--iwl", "5"]) == 2
     assert capsys.readouterr().err.startswith("usage: lvfxp decode ")
+
+
+@dataclasses.dataclass(frozen=True)
+class _Tagged(FxpSpec):
+    tag: str = "x"
+
+
+class _Fixed8(FxpSpec):
+    def __init__(self, integer_word_length: int) -> None:
+        super().__init__(8, integer_word_length)
+
+
+def test_a_dataclass_subclass_is_validated_and_keeps_its_fields() -> None:
+    tagged = _Tagged(8, 5, tag="a")
+    assert (tagged.resolution, tagged.encode("15.875"), tagged.tag) == (Decimal("0.125"), 127, "a")
+    with pytest.raises(lvfxp.FxpError):
+        _Tagged(99, 5)
+    loaded = pickle.loads(pickle.dumps(tagged))
+    assert (type(loaded), loaded, loaded.tag) == (_Tagged, tagged, "a")
+    assert loaded.decode(1) == Decimal("0.125")
+
+
+def test_a_subclass_with_its_own_init_round_trips() -> None:
+    spec = _Fixed8(5)
+    loaded = pickle.loads(pickle.dumps(spec))
+    assert (type(loaded), loaded, loaded.max_value) == (_Fixed8, spec, Decimal("15.875"))

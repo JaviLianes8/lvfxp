@@ -205,7 +205,12 @@ Calls give the same result as in 0.3.0 except in these cases:
 - A float subclass such as `numpy.float64` is read through its shortest repr; 0.3.0 raised
   `decimal.InvalidOperation` for `numpy.float64(1.5)`. `numpy.float32` is not a `float` and
   still needs `float()`.
-- A `FxpSpec` pickled by 0.3.0 loads and works; 1.0.0 pickles hold only the five fields.
+- A `FxpSpec` pickled by 0.3.0 loads and works; 1.0.0 pickles hold only the dataclass
+  fields. Subclasses (dataclass or not) are validated and pickle with their own fields.
+- Integer arguments of an `int` subclass (an `IntEnum`, say) are stored as plain `int`, so a
+  spec's `repr` shows `word_length=8`.
+- Very fine resolutions such as `FxpSpec(64, -4096).resolution` no longer depend on
+  `sys.set_int_max_str_digits` (0.3.0 raised `ValueError` under a 640-digit limit).
 - NumPy integers and other `__index__` types are now accepted where an `int` is expected.
 - A `memoryview` whose items are wider than a byte is now read as its raw bytes; 0.3.0
   counted its items and refused or misread it.

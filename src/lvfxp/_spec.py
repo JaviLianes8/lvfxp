@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copyreg
+import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -30,15 +32,36 @@ class FxpSpec(Layout):
     Decimal('1.5')
     """
 
-    def __reduce__(self) -> tuple[type[FxpSpec], tuple[object, ...]]:
-        # Pickle the fields only; the derived step is rebuilt by __init__ on load.
-        fields = (self.word_length, self.integer_word_length, self.signed, self.delta)
-        return type(self), (*fields, self.offset)
+    def __reduce__(self) -> tuple[object, ...]:
+        # Every dataclass field (a subclass's too) and nothing derived; no __init__ on load.
+        state = {field.name: getattr(self, field.name) for field in dataclasses.fields(self)}
+        return copyreg.__newobj__, (type(self),), state  # type: ignore[attr-defined]
 
     def __setstate__(self, state: dict[str, object]) -> None:
-        # Pickles written by 0.3.0 carry the fields as instance state.
-        names = ("word_length", "integer_word_length", "signed", "delta", "offset")
-        Layout.__init__(self, *(state[name] for name in names))  # type: ignore[arg-type]
+        # Also reads pickles written by 0.3.0, whose state is the same five fields.
+        for name, value in state.items():
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def min_value(self) -> Decimal:
+        """Smallest representable real value.
+
+        >>> from lvfxp import FxpSpec
+        >>> FxpSpec(8, 5).min_value, FxpSpec(8, 5, signed=False).min_value
+        (Decimal('-16.000'), Decimal('0.000'))
+        """
+        return self._scale(self._coded_min)
+
+    @property
+    def max_value(self) -> Decimal:
+        """Largest representable real value.
+
+        >>> from lvfxp import FxpSpec
+        >>> FxpSpec(8, 5).max_value
+        Decimal('15.875')
+        """
+        return self._scale(self._coded_max)
 
     @property
     def byte_length(self) -> int:

@@ -35,6 +35,9 @@ MAX_INTEGER_WORD_LENGTH = 4096
 """lvfxp's own bound on ``abs(integer_word_length)``, keeping exact values a sane size."""
 
 
+_FIELDS = ("word_length", "integer_word_length", "signed", "delta", "offset")
+
+
 @dataclass(frozen=True, init=False)
 class Layout:
     """Fields and value math of :class:`lvfxp.FxpSpec` (documented there)."""
@@ -53,30 +56,33 @@ class Layout:
         delta: Number | None = None,
         offset: Number = 0,
     ) -> None:
-        wl = as_int(word_length, "word_length")
+        for name, value in zip(
+            _FIELDS, (word_length, integer_word_length, signed, delta, offset), strict=True
+        ):
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        # Also run by the __init__ of a dataclass subclass, and after unpickling.
+        wl = as_int(self.word_length, "word_length")
         if not 1 <= wl <= MAX_WORD_LENGTH:
             raise FxpError(f"word_length must be between 1 and {MAX_WORD_LENGTH}, got {short(wl)}")
-        iwl = as_int(integer_word_length, "integer_word_length")
+        iwl = as_int(self.integer_word_length, "integer_word_length")
         if abs(iwl) > MAX_INTEGER_WORD_LENGTH:
             bound = MAX_INTEGER_WORD_LENGTH
             raise FxpError(f"integer_word_length must be between -{bound} and {bound}")
-        if type(signed) is not bool:
+        if type(self.signed) is not bool:
             raise FxpError("signed must be a bool")
-        resolved = None if delta is None else as_decimal(delta, "delta")
-        if resolved is not None and resolved <= 0:
+        delta = None if self.delta is None else as_decimal(self.delta, "delta")
+        if delta is not None and delta <= 0:
             raise FxpError("delta must be positive")
-        for name, value in (
-            ("word_length", wl),
-            ("integer_word_length", iwl),
-            ("signed", signed),
-            ("delta", resolved),
-            ("offset", as_decimal(offset, "offset")),
-        ):
+        offset = as_decimal(self.offset, "offset")
+        for name, value in zip(_FIELDS, (wl, iwl, self.signed, delta, offset), strict=True):
             object.__setattr__(self, name, value)
         # Derived once: batches over very fine layouts must not redo exact arithmetic per item.
-        step = resolved if resolved is not None else power_of_two(iwl - wl)
+        step = delta if delta is not None else power_of_two(iwl - wl)
         object.__setattr__(self, "_step", step)
-        object.__setattr__(self, "_fractions", (Fraction(step), Fraction(self.offset)))
+        object.__setattr__(self, "_fractions", (Fraction(step), Fraction(offset)))
 
     @property
     def resolution(self) -> Decimal:
@@ -97,26 +103,6 @@ class Layout:
     def _coded_max(self) -> int:
         bits = self.word_length - 1 if self.signed else self.word_length
         return (1 << bits) - 1
-
-    @property
-    def min_value(self) -> Decimal:
-        """Smallest representable real value.
-
-        >>> from lvfxp import FxpSpec
-        >>> FxpSpec(8, 5).min_value, FxpSpec(8, 5, signed=False).min_value
-        (Decimal('-16.000'), Decimal('0.000'))
-        """
-        return self._scale(self._coded_min)
-
-    @property
-    def max_value(self) -> Decimal:
-        """Largest representable real value.
-
-        >>> from lvfxp import FxpSpec
-        >>> FxpSpec(8, 5).max_value
-        Decimal('15.875')
-        """
-        return self._scale(self._coded_max)
 
     def _scale(self, coded: int) -> Decimal:
         resolution, offset = self.resolution, self.offset
