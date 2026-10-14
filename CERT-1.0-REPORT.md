@@ -8,8 +8,8 @@ Progress:
 - [x] Errors, typing, docstrings and doctests (items 2 to 5)
 - [x] Contract, fuzz and author mutation round (items 6, 9, 18)
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
-- [ ] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
-- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): first round done (b PASS; a, c, d, e FAIL, fixed); re-verification under way
+- [x] Packaging, e2e and upgrade from PyPI 0.3.0 (items 8, 10, 13, 14)
+- [ ] Independent reviewer and five QA lenses report PASS (items 16, 19): lenses a, b, d PASS at their last rounds; c and e re-checked on the final source; independent review round 1 done, re-review open
 - [ ] Gates (item 15)
 - [ ] PR and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
@@ -109,8 +109,8 @@ worked in its own clone, ran things rather than reading, and reported back priva
 Each mutation was applied alone to a clean clone of the branch, `__pycache__` purged, no
 bytecode written, the suite run with `-x` and a per-mutant timeout, and the clone restored; the
 full suite (wheel end to end included) was green before and after. The first run (1e25323, 52
-mutations) left 11 survivors: 3 equivalent, 8 closed by new contracts (514d8ed, 8ecb78f), and a
-redundant type check removed. The table is the final run at 664ddc5: 58 mutations (the mutated
+mutations) left 11 survivors: 3 equivalent and 8 closed by new contracts (514d8ed, 8ecb78f);
+a twelfth mutation, of a redundant type check, was equivalent and the check was removed. The table is the final run at 664ddc5: 58 mutations (the mutated
 text re-anchored where the source had moved, six added for code written during the round),
 55 killed, 3 equivalent.
 

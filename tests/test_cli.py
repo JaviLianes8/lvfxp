@@ -120,5 +120,5 @@ def test_double_dash_passes_a_negative_exponent_value(capsys: pytest.CaptureFixt
 
 
 def test_out_of_bound_input_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
-    assert _run(capsys, "info", "--wl", "8", "--iwl", "-100000000")[0] == 1
+    assert _run(capsys, "info", "--wl", "8", "--iwl", "-4097")[0] == 1
     assert _run(capsys, "encode", "1e999999999", "--wl", "8", "--iwl", "5")[0] == 1
