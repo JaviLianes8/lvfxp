@@ -179,3 +179,9 @@ where `<` and `<=` agree), M19 (`encode` adds `2**wl` to a negative code, so the
 same), M30 (an unsigned layout's minimum code is 0, so a negative word still fails the next
 check). In the first run, a check refusing floats, `Decimal`, `Fraction` and text as integer
 fields was shown redundant (`operator.index` refuses them) and removed.
+
+## Later QA rounds (item 19)
+
+| Lens | Round | Head | Verdict | Findings and outcome |
+| --- | --- | --- | --- | --- |
+| c | 2 (new reviewer) | 4f4a025 | FAIL (1 medium, 3 low, info) | 14,617 seeded API calls, 300 fuzzed and 224 matrix CLI runs, threads under a hostile context and a 640-digit limit, scaling linear to 10^7; all seven earlier findings fixed. New: an object faking `__class__` (a mock with `spec=`) gave a raw `TypeError` from inside lvfxp; 19-digit exponents named "not a number"; exit 120 when a descriptor was closed inside the process; `--help` exited 0 when its output was lost. Fixed in 3be5bee |
