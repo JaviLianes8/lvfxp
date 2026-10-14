@@ -15,6 +15,7 @@ from decimal import (
 from fractions import Fraction
 
 from ._errors import FxpError, FxpOverflowError
+from ._numbers import short
 
 LV_TRUNCATE = ROUND_FLOOR
 """LabVIEW Truncate: drop the extra low bits, which in two's complement rounds down."""
@@ -46,7 +47,7 @@ _HALF = Fraction(1, 2)
 
 def check_rounding(rounding: str) -> None:
     if not isinstance(rounding, str) or rounding not in ROUNDING_MODES:
-        raise FxpError(f"unknown rounding mode {rounding!r}")
+        raise FxpError(f"unknown rounding mode {short(rounding)}")
 
 
 def overflow_mode(clamp: bool, overflow: str) -> str:
@@ -54,7 +55,9 @@ def overflow_mode(clamp: bool, overflow: str) -> str:
     if not isinstance(clamp, bool):
         raise FxpError("clamp must be a bool")
     if not isinstance(overflow, str) or overflow not in OVERFLOW_MODES:
-        raise FxpError(f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {overflow!r}")
+        raise FxpError(
+            f"overflow must be one of {', '.join(OVERFLOW_MODES)}, not {short(overflow)}"
+        )
     if clamp:
         if overflow == "wrap":
             raise FxpError("clamp=True saturates; it cannot be combined with overflow='wrap'")
@@ -103,4 +106,4 @@ def fit(coded: int, word_length: int, signed: bool, mode: str) -> int:
     if mode == "wrap":
         word = coded & ((1 << word_length) - 1)
         return word - (1 << word_length) if signed and word > high else word
-    raise FxpOverflowError(f"value needs code {coded}, outside [{low}, {high}]")
+    raise FxpOverflowError(f"value needs code {short(coded)}, outside [{low}, {high}]")

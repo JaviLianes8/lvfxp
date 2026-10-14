@@ -123,3 +123,15 @@ def test_cli_does_not_echo_huge_bad_input(capsys: pytest.CaptureFixture[str]) ->
     assert main(["encode", "q" * 100_000, "--wl", "8", "--iwl", "5"]) == 1
     err = capsys.readouterr().err
     assert len(err) < 400
+
+
+def test_option_and_overflow_messages_stay_short() -> None:
+    with pytest.raises(FxpError) as raised:
+        to_fxp(1, 8, 5, rounding="r" * 10_000)
+    assert len(str(raised.value)) < 200
+    with pytest.raises(FxpError) as raised:
+        to_fxp(1, 8, 5, overflow="o" * 10_000)
+    assert len(str(raised.value)) < 200
+    with pytest.raises(FxpError, match="an integer of 33906 bits") as raised:
+        to_fxp("1e9000", 8, -4000)
+    assert len(str(raised.value)) < 200
