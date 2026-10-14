@@ -109,8 +109,9 @@ worked in its own clone, ran things rather than reading, and reported back priva
 Each mutation was applied alone to a clean clone of the branch, `__pycache__` purged, no
 bytecode written, the suite run with `-x` and a per-mutant timeout, and the clone restored; the
 full suite (wheel end to end included) was green before and after. The first run (1e25323, 52
-mutations) left 11 survivors: 3 equivalent and 8 closed by new contracts (514d8ed, 8ecb78f);
-a twelfth mutation, of a redundant type check, was equivalent and the check was removed. The table is the final run at 664ddc5: 58 mutations (the mutated
+mutations) left 11 survivors: 3 equivalent, 7 closed by new contracts (514d8ed) and one in a
+redundant type check, which was removed; the run at a8e90b4 found one more (M39), closed in
+8ecb78f. The table is the final run at 664ddc5: 58 mutations (the mutated
 text re-anchored where the source had moved, six added for code written during the round),
 55 killed, 3 equivalent.
 
