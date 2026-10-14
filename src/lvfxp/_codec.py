@@ -34,7 +34,10 @@ def to_fxp(
 
 
 def from_fxp(
-    word: int, word_length: SupportsIndex, integer_word_length: SupportsIndex, signed: bool = True
+    word: SupportsIndex,
+    word_length: SupportsIndex,
+    integer_word_length: SupportsIndex,
+    signed: bool = True,
 ) -> Decimal:
     """Decode a fixed-point ``word`` back into its exact real value.
 

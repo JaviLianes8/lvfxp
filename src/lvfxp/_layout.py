@@ -41,9 +41,9 @@ class Layout:
 
     word_length: int
     integer_word_length: int
-    signed: bool
-    delta: Decimal | None
-    offset: Decimal
+    signed: bool = True
+    delta: Decimal | None = None
+    offset: Decimal = Decimal(0)
 
     def __init__(
         self,

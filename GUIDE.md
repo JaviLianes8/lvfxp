@@ -196,7 +196,13 @@ integer-string limit (4300 digits) is refused by the option parser, so it is a u
 
 ## Upgrading from 0.3.0
 
-Every 0.3.0 call keeps its result. The differences are at the edges:
+Every valid 0.3.0 call keeps its result. The differences are at the edges:
+
+- Batches (`encode_many`, `decode_many`, `pack_array`) refuse text, bytes-like objects and
+  non-iterables (0.3.0 encoded the characters of `"12"`), and check their options even when
+  empty.
+- A NumPy float or other float subclass is read through its shortest repr; 0.3.0 raised
+  `decimal.InvalidOperation` for `numpy.float64(1.5)`.
 
 - NumPy integers and other `__index__` types are now accepted where an `int` is expected.
 - A `memoryview` whose items are wider than a byte is now read as its raw bytes; 0.3.0

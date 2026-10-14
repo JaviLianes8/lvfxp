@@ -91,7 +91,8 @@ def uncompact_word(data: Bytes, word_length: int) -> int:
     data = as_bytes(data)
     size = compact_size(word_length)
     if len(data) != size:
-        raise FxpError(f"expected {size} compact bytes, got {len(data)}")
+        unit = "byte" if size == 1 else "bytes"
+        raise FxpError(f"the compact form of this layout is {size} {unit}, got {len(data)}")
     return int.from_bytes(data, "big") & ((1 << word_length) - 1)
 
 

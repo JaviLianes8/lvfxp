@@ -105,3 +105,29 @@ def test_a_fine_layout_is_prepared_once_for_a_batch() -> None:
     values = spec.decode_many(range(2000))
     assert spec.encode_many(values) == list(range(2000))
     assert time.perf_counter() - start < 2
+
+
+def test_every_integer_argument_is_typed_supports_index() -> None:
+    import typing
+
+    import lvfxp
+
+    for function in (lvfxp.from_fxp, lvfxp.to_fxp, lvfxp.unpack_fxp, lvfxp.pack_fxp_compact):
+        hints = typing.get_type_hints(function)
+        for name in ("word_length", "integer_word_length", "word"):
+            if name in hints:
+                assert hints[name] is typing.SupportsIndex, (function, name)
+
+
+def test_the_dataclass_fields_keep_their_defaults() -> None:
+    import dataclasses
+
+    defaults = {f.name: f.default for f in dataclasses.fields(FxpSpec)}
+    assert defaults["signed"] is True
+    assert defaults["delta"] is None
+    assert defaults["offset"] == 0
+
+
+def test_a_one_byte_compact_form_is_named_in_the_singular() -> None:
+    with pytest.raises(FxpError, match=r"is 1 byte, got 2$"):
+        FxpSpec(4, 4).unpack_compact(bytes(2))

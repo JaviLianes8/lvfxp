@@ -27,8 +27,9 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   what they always held; the constructor still takes any number.
 - A negative array count is refused as such ("array count must not be negative").
 - Messages for wide integers read `a code of 136 bits` and `a word of 16610 bits`.
-- Byte arguments accept any bytes-like buffer and read its raw bytes: a `memoryview` of any
-  format (an `array("H")`, for example) counts its bytes, not its items. The type hints now
+- Byte arguments (`bytes`, `bytearray` or `memoryview`) are read as their raw bytes: a
+  `memoryview` of any format (of an `array("H")`, for example) counts its bytes, not its
+  items. The type hints now
   say `bytes | bytearray | memoryview`, matching what 0.3.0 already accepted at run time.
 - Error messages quote at most 40 characters of a value, and describe integers wider than
   64 bits by their size, so huge input can no longer produce a huge message. A word or an
@@ -59,11 +60,12 @@ command keep their 0.3.0 behaviour. See the upgrade notes in
   for `5`.
 - Very fine resolutions no longer depend on `sys.set_int_max_str_digits`: with a limit of 640
   digits, 0.3.0 raised `ValueError` for `FxpSpec(64, -4096).resolution`.
-
-- The value math moved into a private base class; tracebacks and messages still name
-  `FxpSpec`.
-- The project URL `Repository` is now `Source`, and the sdist ships the tests and the
-  LabVIEW captures.
+- The value math moved into a private base class; run-time messages and tracebacks still
+  name `FxpSpec`, while `help()` and type checkers show the base class.
+- A float subclass such as `numpy.float64` is read through its shortest repr; 0.3.0 raised
+  `decimal.InvalidOperation` for `numpy.float64(1.5)`.
+- The project URL `Repository` is now `Source`. The sdist lists its contents explicitly: it
+  adds GUIDE.md and leaves out the scripts, process notes and git files.
 
 ### Added
 
