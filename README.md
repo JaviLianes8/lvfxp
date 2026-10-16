@@ -1,5 +1,7 @@
 # lvfxp
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Encode and decode LabVIEW fixed-point (FXP) numbers and their flattened bytes, exactly, in
 pure Python, with no dependencies. Python 3.10 or newer.
 
